@@ -12,8 +12,11 @@ start() -> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 stop()  -> gen_server:call(?MODULE, stop).
 
 register(Key,Pid, Meta) -> gen_server:call(?MODULE, {new, Key, Pid, Meta}).
+register_self(Key, Meta) -> gen_server:call(?MODULE, {new, Key, Meta}).
 unregister(Key) -> gen_server:call(?MODULE, {remove, Key}).
 update_attribute(Key, NewMeta) -> gen_server:call(?MODULE, {update,
+Key, NewMeta}).
+aupdate_attribute(Key, NewMeta) -> gen_server:cast(?MODULE, {update,
 Key, NewMeta}).
 
 find_pid(Key) ->
@@ -57,11 +60,20 @@ get_env_by_pid(Pid) ->
 
 
 
-init([]) -> {ok, ets:new(?MODULE,[set, public, named_table])}.
+init([]) -> {ok, ets:new(?MODULE,[set, private, named_table, {write_concurrency, true}, {read_concurrency, true}])}.
 
 handle_call({new, Key, Pid, Meta}, _From, Tab) ->
     Reply = case ets:lookup(Tab, Key) of
 		[]  ->
+		    Ref = erlang:monitor(process, Pid),
+		    ets:insert(Tab, {Key, Pid, Ref, Meta});
+		[_] -> {already_registered}
+	    end,
+    {reply, Reply, Tab};
+handle_call({new, Key, Meta}, _From, Tab) ->
+    Reply = case ets:lookup(Tab, Key) of
+		[]  ->
+		    {Pid, _Tag} = _From,
 		    Ref = erlang:monitor(process, Pid),
 		    ets:insert(Tab, {Key, Pid, Ref, Meta});
 		[_] -> {already_registered}
@@ -78,9 +90,9 @@ handle_call({remove, Key}, _From, Tab) ->
 handle_call({update,Key,NewMeta}, _From, Tab) ->
     Reply = case ets:lookup_element(Tab, Key, 4) of
 		[]  -> not_registered;
-		[L] ->
-		    {Key,V} = NewMeta,
-		    NewEnv = lists:keyreplace(Key,1,L,{Key,V}),
+		L ->
+		    {Id1,V1} = NewMeta,
+		    NewEnv = lists:keyreplace(Id1,1,L,{Id1,V1}),
 		    ets:update_element(Tab, Key, {4,NewEnv})
 	    end,
     {reply, Reply, Tab};
@@ -101,6 +113,15 @@ handle_call(stop, _From, Tab) ->
 handle_cast({send,Msg,Pred}, State) ->
     send_all_env(?MODULE,Msg,Pred),
     {noreply, State};
+handle_cast({update,Key,NewMeta}, Tab) ->
+    case ets:lookup_element(Tab, Key, 4) of
+		[]  -> not_registered;
+		L ->
+		    {Id1,V1} = NewMeta,
+		    NewEnv = lists:keyreplace(Id1,1,L,{Id1,V1}),
+		    ets:update_element(Tab, Key, {4,NewEnv})
+	    end,
+    {noreply, Tab};
 handle_cast(_,State) -> {noreply, State}.
 
 

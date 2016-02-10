@@ -1,31 +1,12 @@
-%% ``Licensed under the Apache License, Version 2.0 (the "License");
-%% you may not use this file except in compliance with the License.
-%% You may obtain a copy of the License at
-%%
-%%     http://www.apache.org/licenses/LICENSE-2.0
-%%
-%% Unless required by applicable law or agreed to in writing, software
-%% distributed under the License is distributed on an "AS IS" BASIS,
-%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-%% See the License for the specific language governing permissions and
-%% limitations under the License.
-%%
-%% The Initial Developer of the Original Code is Ericsson Utvecklings AB.
-%% Portions created by Ericsson are Copyright 1999, Ericsson Utvecklings
-%% AB. All Rights Reserved.''
-%%
-%%     $Id$
-%%
+%% Almost code in this module is replicated from erl_parse_id module
+%% from Erlang OTP version 18 - which is a identity transformer of Erlang
+%% abstract syntax.
+
+%% I introduce the with Construct in order to extend the receive
+%% construct of Erlang .
+
+
 -module(aerl_with).
-
-%% A identity transformer of Erlang abstract syntax.
-
-%% Adding the with Construct from me.
-
-%% This module only traverses legal Erlang code. This is most noticeable
-%% in guards where only a limited number of expressions are allowed.
-%% N.B. if this module is to be used as a basis for tranforms then
-%% all the error cases must be handled otherwise this module just crashes!
 
 -export([parse_transform/2]).
 

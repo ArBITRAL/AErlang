@@ -1,7 +1,7 @@
 %% TEST AErlang
 -module(test).
--compile({parse_transform, aerl_with}).
 
+-compile({parse_transform, aerl_with}).
 -export([start/1]).
 
 start(ProcessesCount) ->
@@ -12,7 +12,7 @@ start(ProcessesCount) ->
 %    Pred = "tt",
     Msg = {ping, self()},
     Env = env_init(robot,red,research,90),
-    aerlang:register(9999,self(),Env),
+    aerlang:register_self(9999,Env),
 
     {Time,_V} = timer:tc(aerlang,send,[Msg,Pred]),
     io:format("Time to send ~p ms~n",[Time/1000]),
@@ -29,11 +29,13 @@ create_process(Key,Name,Color,Role,Battery) ->
 			loop(Env) end),
 
     aerlang:register(Key,Pid,Env),
-%   io:format("~p has ~p~n",[Pid,aerlang:get_env(Key)]),
+    aerlang:update_attribute(Key,{'Name',somename}),
+    timer:sleep(1000),
+   io:format("~p has ~p~n",[Pid,aerlang:get_env_by_key(Key)]),
     Pid.
 
 loop(_State) ->
-    with("ff"),
+    with ("tt"),
     receive
 	{ping, _From}
 	   ->
