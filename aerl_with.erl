@@ -11,7 +11,9 @@
 -export([parse_transform/2]).
 
 parse_transform(Forms, _Options) ->
-    forms(Forms).
+    Forms1 = forms(Forms),
+    io:format("~s~n", [erl_prettypr:format(erl_syntax:form_list(Forms1))]),
+    Forms1.
 
 %% forms(Fs) -> lists:map(fun (F) -> form(F) end, Fs).
 
@@ -384,13 +386,13 @@ with_helper(C0,_Var) ->
     C0.
 
 with_modify(Exp,Var,EPid) ->
-    OExp = forms:from_abstract(Exp),
+    OExp = [forms:from_abstract(T) || T <- Exp],
     R = lists:flatten(io_lib:format("~p",[Var])),
     Pid1 = lists:flatten(io_lib:format("~p",[EPid])),
     Pred = re:replace(R, "\'", "", [global, {return, list}]),
     NewPid = re:replace(Pid1, "\'", "", [global, {return, list}]),
-    Str = "case aerlang:eval(" ++ Pred ++ ",aerlang:get_env_by_pid(" ++ NewPid ++")) of true -> " ++ OExp ++ ";false -> void end.",
-%    io:format("OExp ~p~n",[Str]),
+    Str = "case aerlang:eval(" ++ Pred ++ ",aerlang:get_env_by_pid(" ++ NewPid ++")) of true -> " ++ string:join(OExp,",") ++ ";false -> void end.",
+%    io:format("New Exp ~p~n",[Str]),
     NewExp = forms:to_abstract(Str),
     NewExp.
 

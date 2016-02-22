@@ -42,12 +42,16 @@ find_key(Pid) ->
 %% by evaluating the predicate
 asend(Msg, Pred) ->
 %    send_all_env(?MODULE,Msg,Pred).
-    gen_server:cast(?MODULE, {send, Msg, Pred}).
+    gen_server:cast(?MODULE, {asyn_send, Msg, Pred}).
 
 send(Msg,Pred) ->
     gen_server:call(?MODULE, {send, Msg, Pred}).
 
+send_with_threshold(Msg,Pred,T1) ->
+    gen_server:call(?MODULE, {send_with_threshold, Msg, Pred, T1}).
+
 get_env_by_key(Key) ->
+%    io:format("LOOK UP~p",[Key]),
     ets:lookup_element(?MODULE, Key, 4).
 
 get_env_by_pid(Pid) ->
@@ -60,16 +64,20 @@ get_env_by_pid(Pid) ->
 
 
 
-init([]) -> {ok, ets:new(?MODULE,[set, private, named_table, {write_concurrency, true}, {read_concurrency, true}])}.
+init([]) ->
+    State = ets:new(?MODULE,[set, public, named_table, {write_concurrency, true}, {read_concurrency, true}]),
+    {ok, State}.
 
 handle_call({new, Key, Pid, Meta}, _From, Tab) ->
     Reply = case ets:lookup(Tab, Key) of
 		[]  ->
 		    Ref = erlang:monitor(process, Pid),
 		    ets:insert(Tab, {Key, Pid, Ref, Meta});
+		    %io:format("Register infor ~p,~p,~p,~p~n",[Key,Pid,Ref,Meta]);
 		[_] -> {already_registered}
 	    end,
     {reply, Reply, Tab};
+
 handle_call({new, Key, Meta}, _From, Tab) ->
     Reply = case ets:lookup(Tab, Key) of
 		[]  ->
@@ -106,11 +114,15 @@ handle_call({send,Msg,Pred}, _From, Tab) ->
     Reply = send_all_env(?MODULE,Msg,Pred),
     {reply, Reply, Tab};
 
+handle_call({send_with_threshold,Msg,Pred,T1}, _From, Tab) ->
+    Reply = send_with_threshold(?MODULE,Msg,Pred,T1),
+    {reply, Reply, Tab};
+
 handle_call(stop, _From, Tab) ->
     ets:delete(Tab),
     {stop, normal, stopped, Tab}.
 
-handle_cast({send,Msg,Pred}, State) ->
+handle_cast({asyn_send,Msg,Pred}, State) ->
     send_all_env(?MODULE,Msg,Pred),
     {noreply, State};
 handle_cast({update,Key,NewMeta}, Tab) ->
@@ -148,6 +160,25 @@ send_all_env(EtsIndex, NextKey, Msg, Pred) ->
 	false -> void
     end,
     send_all_env(EtsIndex, ets:next(EtsIndex, NextKey), Msg, Pred).
+
+%% helper functions
+send_with_threshold(EtsIndex,Msg, Pred,T1) ->
+  send_with_threshold(EtsIndex, ets:first(EtsIndex), Msg, Pred, T1).
+
+send_with_threshold(_, '$end_of_table', _, _, _) -> done;
+send_with_threshold(EtsIndex, NextKey, Msg, Pred, T1) ->
+    if T1 > 0 ->
+	    [{_,Pid,_,Meta}] = ets:lookup(EtsIndex, NextKey),
+	    T2 = case eval(Pred,Meta) of
+		true ->
+			 Pid ! Msg,
+			 T1 -1;
+		false ->
+			 T1
+	    end,
+	    send_with_threshold(EtsIndex, ets:next(EtsIndex, NextKey), Msg, Pred,T2);
+       true -> void
+    end.
 
 
 %% Helper functions

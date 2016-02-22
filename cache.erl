@@ -18,11 +18,9 @@
 -export([datum_start/2, datum_init/3]).
 
 %% Cache size
--define(CSIZE, 1000).
--define(TIMEOUT, 60000).
--define(PRED1, "FoA < 2").
--define(PRED2, "FoA < 2 or Cost >= 500").
--define(PRED(X), X).
+-define(CSIZE, 7000).
+-define(TIMEOUT, 30000).
+
 
 
 %%%--------------------------------------------
@@ -45,28 +43,28 @@ get_datum_pid(CacheMgr, DatumId) when is_pid(CacheMgr) ->
 	{failed, CacheMgr, DatumId, Reason} ->
 	    {failed, Reason};
 	{InvalidRequest, CacheMgr, DatumId, invalid_request} ->
-	    {invalid_request, InvalidRequest}
-%	InvalidResponse ->
+	    {invalid_request, InvalidRequest};
+	InvalidResponse ->
 %	    io:format("Here invalid ~n"),
-%	    {invalid_response, InvalidResponse}
-    after
+	    {invalid_response, InvalidResponse}
+  %  after
 	%% increase timeout from 1 secs to 5 secs
 	%% due to waiting for replacement
-	1000 -> {no_datum, timeout}
+%	1000 -> {no_datum, timeout}
     end.
 
 get_stats(CacheMgr) when is_pid(CacheMgr) ->
-    io:format("Starting get stats~n"),
+%    io:format("Starting get stats~n"),
     CacheMgr ! {stats, self()},
     receive
 	{stats, CacheMgr, AllStats} ->
-	    io:format("Get Stats properly~n"),
+%	    io:format("Get Stats properly~n"),
 	    AllStats;
 	InvalidResponse ->
-	    io:format("Get Stats ~n"),
+%	    io:format("Get Stats ~n"),
 	    InvalidResponse
-    after
-	1000 -> {no_cache_mgr, timeout}
+ %   after
+%	1000 -> {no_cache_mgr, timeout}
     end.
 
 %%%--------------------------------------------
@@ -77,10 +75,10 @@ get_data(DatumPid) when is_pid(DatumPid) ->
     DatumPid ! {get, self()},
     receive
 	{get, DatumPid, Data} ->  {ok, Data};
-	{InvalidResponse, DatumPid, Param} -> {no_data, {InvalidResponse, Param}}
-	%_ -> {no_data, invalid_response}
-    after
-	1000 -> {no_data, timeout}
+	{InvalidResponse, DatumPid, Param} -> {no_data, {InvalidResponse, Param}};
+	_ -> {no_data, invalid_response}
+ %   after
+%	1000 -> {no_data, timeout}
     end.
 
 %% get state info
@@ -150,11 +148,11 @@ mgr_loop(EtsTab, DataModule, DataAccessor) ->
     receive
 
 	%% A monitored datum process just went down...
-%	{'DOWN', _Ref, process, _Pid, _Reason} ->
+	{'DOWN', _Ref, process, _Pid, _Reason} ->
   %io:format("Notification: ~p just went down for reason ~p~n", [Pid,_Reason]),
-% 	    ets:match_delete(EtsTab,{'_',_Pid}),
-	{DatumId, die_pred} ->
-	    ets:delete(EtsTab,DatumId),
+ 	    ets:match_delete(EtsTab,{'_',_Pid}),
+%	{DatumId, die_pred} ->
+%	    ets:delete(EtsTab,DatumId),
 	    mgr_loop(EtsTab, DataModule, DataAccessor);
 
 	%% Return a process id from the cache index...
@@ -187,7 +185,7 @@ mgr_loop(EtsTab, DataModule, DataAccessor) ->
 
 	%% for testing
 	terminate ->
-	    io:format("Cache Manager terminating ...~n"),
+	   % io:format("Cache Manager terminating ...~n"),
 	    ets:delete(EtsTab);
 
 	%% Invalid requests are signalled back to client...
@@ -225,25 +223,22 @@ launch_datum(DatumId, EtsTab, DataModule, DataAccessor, true) ->
 launch_datum(DatumId, EtsTab, DataModule, DataAccessor) ->
     DataToCache = DataModule:DataAccessor(DatumId),
     Pid = datum_start(DatumId, DataToCache),
-    %erlang:monitor(process, Pid),
+    erlang:monitor(process, Pid),
     ets:insert(EtsTab, {DatumId, Pid}),
     Pid.
 
+-define(PRED1, "FoA < 2").
+-define(PRED2, "FoA < 2 or Cost > 500").
+-define(PRED3, "FoA < 2 and Cost > 500").
 
 %% ask all processes and eliminating based on Predicate
 reap_datum(_EtsTab) ->
-    %AllProcs = get_all_pids(EtsTab),
-%    AllProcs = ets:tab2list(EtsTab),
-%    Predicate = term_to_binary(?PRED1),
     Msg = {shutdown, self()},
-    Predicate = ?PRED1,
-    %send message to Pids for shutdown according to Predicate
-%    [Pid || {_DatumId,Pid}<- AllProcs, (Pid ! Msg) =:= Msg],
-    aerlang:send(Msg, Predicate).
-%    receive
-%	{_, die_pred} ->
-%	    void
- %   end.
+    Predicate = ?PRED3,
+%    aerlang:send_with_threshold(Msg, Predicate,?CSIZE div 10).
+    aerlang:send(Msg,Predicate).
+
+
 
 %%%--------------------------------------------
 %%% Cache data object functions
@@ -255,12 +250,15 @@ datum_start(Id, DataToCache) ->
     spawn(cache, datum_init, [Id, self(), DataToCache]).
 
 datum_init(Id, Mgr, DataToCache) ->
-    LastActive = now(),
+    LastActive = os:timestamp(),
     FoA = 0,
     TTL = ?TIMEOUT,
     %io:format("Datum ~p start at ~p~n", [Id, LastActive]),
     %% Prepare the attribute environment
     %% And resgister to middleware
+
+    <<A:32, B:32, C:32>> = crypto:rand_bytes(12),
+    random:seed(A,B,C),
     Cost = random:uniform(1000),
     Env = [{'FoA', FoA}, {'Cost', Cost}],
     aerlang:register_self(Id, Env),
@@ -274,7 +272,7 @@ datum_loop(#datum_state{id=Id, mgr=Mgr, data=Data, ttl=TTL, la=LastActive, foa=F
 	%% Cache manager indicates new data to be replaced...
 	{new_data, Mgr, Replacement} ->
 	    Mgr ! {new_data, self(), Data},
-	    Active = now(),
+	    Active = os:timestamp(),
 	    %io:format("Last active of process ~p is ~p miliseconds~n",[Id, timer:now_diff(Active,LastActive)/1000]),
 	    datum_loop(State#datum_state{data=Replacement,la=Active});
 
@@ -282,13 +280,13 @@ datum_loop(#datum_state{id=Id, mgr=Mgr, data=Data, ttl=TTL, la=LastActive, foa=F
 	%% Shut down from Aerlang
 	{shutdown, Mgr} ->
 	     	    %ets:delete(double_cache,Id),
-		    Mgr ! {Id, die_pred},
+		    %Mgr ! {Id, die_pred},
 		    exit(normal);
 
 	%% refinement: cache manager asks for process age ...
 	%% not reset the TTL
 	{last_active, Mgr } ->
-	    Active = now(),
+	    Active = os:timestamp(),
 	    IDL = round(timer:now_diff(Active,LastActive)/1000),
 	    NewTTL = TTL - IDL,
 	    %% io:format("age of process ~p is ~p miliseconds and NewTTL is ~p ~n",[Id,IDL,NewTTL]),
@@ -304,7 +302,7 @@ datum_loop(#datum_state{id=Id, mgr=Mgr, data=Data, ttl=TTL, la=LastActive, foa=F
 	{get, From} when is_pid(From) ->
 	    From ! {get, self(), Data},
 	    aerlang:aupdate_attribute(Id,{'FoA',FoA+1}),
-	    datum_loop(State#datum_state{la=now(),foa=FoA+1});
+	    datum_loop(State#datum_state{la=os:timestamp(),foa=FoA+1});
 
 	%% Request for memory size used...
 	{memsize, From} when is_pid(From) ->
@@ -337,12 +335,7 @@ datum_loop(#datum_state{id=Id, mgr=Mgr, data=Data, ttl=TTL, la=LastActive, foa=F
     end.
 
 
-%% SEND PRIMITIVES
-set_predicate(P) ->
-    ?PRED(P).
-
 supervisor(Pid) ->
-    %erlang:monitor(process, Pid),
     spawn(fun() ->
 		  process_flag(trap_exit, true),
 		  link(Pid),
@@ -360,30 +353,38 @@ test() ->
     aerlang:start(),
     %% start cache manager
     M = mgr_start(),
-    S = supervisor(M),
-    io:format("Test with: CacheSize = ~p, Attribute-based Policy, Timeout ~p seconds~n",[?CSIZE,?TIMEOUT/1000]),
-    io:format("Supervisor of manager ~p started ~p~n",[M,S]),
+  %  S = supervisor(M),
+   % io:format("Test with: CacheSize = ~p, Attribute-based Policy, Timeout ~p seconds~n",[?CSIZE,?TIMEOUT/1000]),
+   % io:format("Supervisor of manager ~p started ~p~n",[M,S]),
     %% start random generator
-    RPid = spawn(fun() -> rand(now()) end),
-    register(rand_gen, RPid),
-    io:format("-> Filling cache ...~n"),
-    full_cache(M,1,?CSIZE),
-    %io:format("-> Sending ~p random requests ...~n ",[?REQUEST]),
-    %start_requests(M,?REQUEST,true),
-    full_cache(M,1,?CSIZE-1),
-%    R = ?CSIZE*2,
- %   io:format("-> Sending ~p random exsting requests ...~n ",[R]),
-  %  random_requests(M,R),
-    io:format("-> Cache manager state ~p~n",[get_stats(M)]),
+    RPid = spawn(fun() -> rand() end),
 
-    io:format("-> More requests ~n"),
+    register(rand_gen, RPid),
+   % io:format("-> Filling cache ...~n"),
+    full_cache(M,1,?CSIZE),
+    R = ?CSIZE*2,
+   % io:format("-> Sending ~p random requests ...~n ",[R]),
+    random_requests(M,R),
+
+
+    %io:format("-> Sending ~p exsting requests ...~n ",[R]),
+    %full_cache(M,1,R),
+   % io:format("-> Cache manager state ~p~n",[get_stats(M)]),
+
+   % io:format("-> More request ~n"),
 %    start_requests(M,1000001,21),
     _D = get_cached_data(M, 100000100),
-   io:format("get data ~p~n",[_D]),
+ %  io:format("get data ~p~n",[_D]),
     timer:sleep(2000),
-    io:format("-> Cache manager state ~p~n",[get_stats(M)]),
+  %  io:format("-> Cache manager state ~p~n",[get_stats(M)]),
     unregister(rand_gen),
-    M ! terminate.
+
+    %io:format("kill all processes ~n"),
+    Pids1 = ets:tab2list(double_cache),
+    Msg1 = {shutdown,M},
+    [Pid1 || {'_',Pid1} <- Pids1, (Pid1 ! Msg1) =:= Msg1],
+    M ! terminate,
+    aerlang:stop().
 
 %% start_requests/2
 %% @doc Starts a given number of cached data requests.
@@ -393,7 +394,7 @@ start_requests(_,_,0) ->
 start_requests(Mgr, Base, R) when is_pid(Mgr) ->
     % Simulating access data
     _D = get_cached_data(Mgr, Base),
-   io:format("get data ~p~n",[_D]),
+%   io:format("get data ~p~n",[_D]),
 %    timer:sleep(1000),
     start_requests(Mgr, Base+1, R-1),
     ok.
@@ -420,14 +421,16 @@ random_requests(Mgr, R) when is_pid(Mgr) ->
 % integer random generator, relies on random module
 % state is now()
 
-rand(State) ->
+rand() ->
     receive
         {From, N} when is_pid(From) ->
-            {Int, NewState} = random:uniform_s(N, State),
+	    <<A:32, B:32, C:32>> = crypto:rand_bytes(12),
+	    random:seed(A,B,C),
+            Int = random:uniform(N),
             From ! {randgen, Int},
-            rand(NewState);
+            rand();
         _Other ->
-            rand(State)
+            rand()
     end.
 
 randint(N) ->
@@ -438,11 +441,3 @@ randint(N) ->
     after
 	1000 -> {error, timeout}
     end.
-
-get_all_pids(EtsIndex) ->
-  get_all_pids(EtsIndex, ets:first(EtsIndex), []).
-
-get_all_pids(_, '$end_of_table', Pids) -> Pids;
-
-get_all_pids(EtsIndex, NextKey, Pids) ->
-    get_all_pids(EtsIndex, ets:next(EtsIndex, NextKey), [Pid = ets:lookup_element(EtsIndex, NextKey, 2) |  Pids]).

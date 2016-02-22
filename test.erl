@@ -29,9 +29,9 @@ create_process(Key,Name,Color,Role,Battery) ->
 			loop(Env) end),
 
     aerlang:register(Key,Pid,Env),
-    aerlang:update_attribute(Key,{'Name',somename}),
+ %   aerlang:update_attribute(Key,{'Name',somename}),
     timer:sleep(1000),
-   io:format("~p has ~p~n",[Pid,aerlang:get_env_by_key(Key)]),
+    io:format("~p has ~p~n",[Pid,aerlang:get_env_by_key(Key)]),
     Pid.
 
 loop(_State) ->
