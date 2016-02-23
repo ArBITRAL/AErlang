@@ -2,7 +2,7 @@
 .SUFFIXES: .erl .beam .yrl
 
 .erl.beam:
-	erlc -W -I ./include -pa ./ -o ./ $<
+	erlc -W -I ./include -pa ebin -o ebin $<
 
 .yrl.erl:
 	erlc -W $<
@@ -14,7 +14,7 @@ ERL = erl -boot start_clean
 # to the end of the line and continue on the next line
 
 # Edit the lines below
-MODS = aerlang aerl_with forms test
+MODS = aerlang aerl_trans
 
 # The first target in any makefile is the default target.
 # If you just type "make" then "make all" is assumed (because
