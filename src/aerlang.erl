@@ -49,14 +49,13 @@ find_key(Pid) ->
 %% Objects of Meta structure assuming
 %% Key, Pid, [{K1,V1},{K2,V2},...]
 
-%% Let the aerlang determine which processes are targets for sending
-%% by evaluating the predicate
-%asend(Msg, Pred) ->
-%    send_all_env(?MODULE,Msg,Pred).
-%    gen_server:cast(?MODULE, {asyn_send, Msg, Pred}).
+%% Asynchronous (default)
+send(Msg, Pred) ->
+    gen_server:cast(?MODULE, {async_send, Msg, Pred}).
 
-send(Msg,Pred) ->
-    gen_server:call(?MODULE, {send, Msg, Pred}).
+%% Synchronous
+ssend(Msg,Pred) ->
+    gen_server:call(?MODULE, {sync_send, Msg, Pred}).
 
 send_with_threshold(Msg,Pred,T1) ->
     gen_server:call(?MODULE, {send_with_threshold, Msg, Pred, T1}).
@@ -131,8 +130,9 @@ handle_call({find,Key}, _From, Tab) ->
 	 [{Key,Pid,_,_,_}] -> Pid
     end,
     {reply, Reply, Tab};
-handle_call({send,Msg,Pred}, From, Tab) ->
+handle_call({sync_send,Msg,Pred}, From, Tab) ->
     {Sender,_} = From,
+%    io:format("~p has ~p~n",[Sender,ets:match(?MODULE, {'_',Sender,'_','$1','_'})]),
     [[Env_sender]] = ets:match(?MODULE, {'_',Sender,'_','$1','_'}),
     Reply = send_all_env(?MODULE,Msg,Pred,Env_sender),
     {reply, Reply, Tab};
@@ -145,6 +145,13 @@ handle_call(stop, _From, Tab) ->
     ets:delete(Tab),
     {stop, normal, stopped, Tab}.
 
+
+%% Todo
+handle_cast({async_send,Msg,Pred}, Tab) ->
+%    {Sender,_} = From,
+%    [[Env_sender]] = ets:match(?MODULE, {'_',Sender,'_','$1','_'}),
+%    Reply = send_all_env(?MODULE,Msg,Pred,Env_sender),
+    {noreply, Tab};
 %handle_cast({asyn_send,Msg,Pred}, State) ->
 %    [[Env_sender]] = ets:match(?MODULE, {'_',Sender,'_','$1','_'}),
 %    send_all_env(?MODULE,Msg,Pred,Env_sender),
