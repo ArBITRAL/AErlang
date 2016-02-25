@@ -50,4 +50,4 @@ You can declare a Predicate before Erlang receive construct. And use it to filte
         ....
     end.
 Whenever a from is used, it must be followed by a receive construct.
-### See test and example folder for more details on how to use
+See the test and example folder for more details on how to use
