@@ -343,7 +343,7 @@ exprs([E0|Es]) ->
 	true ->
 	    [H|T] = Es,
 %	    io:format("FIND with construct~p and ~p~n",[E0,H]),
-	    {E1,E2} = from_syntax(E0,H),
+	    {E1,E2} = with_syntax(E0,H),
 	    [E1|[E2|exprs(T)]]
     end;
 
@@ -353,7 +353,7 @@ exprs([]) -> [].
 %% from construct by
 %% expr({call, Line, {atom, _Line1, from},
 %% handle this contruct with the receive construct at once
-from_syntax({call, Line, {atom, _, from}, [{_, _, Var}]}, ReceiveClause) ->
+with_syntax({call, Line, {atom, _, from}, [{_, _, Var}]}, ReceiveClause) ->
     %% with must be followed by receive clause
 %    io:format("Receive ~p~n",[ReceiveClause]),
     case element(1,ReceiveClause) == 'receive' of
@@ -493,13 +493,8 @@ expr({op,Line,Op,A0}) ->
 %% to(Pred) ! Msg
 expr({op,Line,Op,{call, Line, {atom, Line, to},[Pred]},Content}) ->
     {call,Line,
-       {remote,Line,{atom,Line,aerlang},{atom,Line,ssend}},
+       {remote,Line,{atom,Line,aerlang},{atom,Line,send}},
        [Content,Pred]};
-
-%expr({op,Line,Op,{call, Line, {atom, Line, s_to},[Pred]},Content}) ->
-%    {call,Line,
-%       {remote,Line,{atom,Line,aerlang},{atom,Line,ssend}},
-%       [Content,Pred]};
 
 expr({op,Line,Op,L0,R0}) ->
     L1 = expr(L0),

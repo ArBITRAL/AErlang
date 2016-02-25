@@ -26,8 +26,8 @@ supdate(Key, NewMeta) -> gen_server:call(?MODULE, {update_att,
 Key, NewMeta}).
 
 %% Asynchornous update predicate by Pid
-set_predicate(Pid, Pred) ->
-    gen_server:call(?MODULE, {update_pred, Pid, Pred}).
+set_predicate(Pid, Pred) -> io:format("pred~n"),gen_server:call(?MODULE, {update_pred,
+Pid, Pred}).
 
 
 find_pid(Key) ->
@@ -49,13 +49,14 @@ find_key(Pid) ->
 %% Objects of Meta structure assuming
 %% Key, Pid, [{K1,V1},{K2,V2},...]
 
-%% Asynchronous (default)
-send(Msg, Pred) ->
-    gen_server:cast(?MODULE, {async_send, Msg, Pred}).
+%% Let the aerlang determine which processes are targets for sending
+%% by evaluating the predicate
+%asend(Msg, Pred) ->
+%    send_all_env(?MODULE,Msg,Pred).
+%    gen_server:cast(?MODULE, {asyn_send, Msg, Pred}).
 
-%% Synchronous
-ssend(Msg,Pred) ->
-    gen_server:call(?MODULE, {sync_send, Msg, Pred}).
+send(Msg,Pred) ->
+    gen_server:call(?MODULE, {send, Msg, Pred}).
 
 send_with_threshold(Msg,Pred,T1) ->
     gen_server:call(?MODULE, {send_with_threshold, Msg, Pred, T1}).
@@ -118,12 +119,10 @@ handle_call({update_att,Key,NewMeta}, _From, Tab) ->
 	    end,
     {reply, Reply, Tab};
 handle_call({update_pred,Pid,Pred}, _From, Tab) ->
-
     Reply = case ets:match(?MODULE,{'$1',Pid,'_','_','_'}) of
 	[] -> undefined;
 	[[Key]] -> ets:update_element(Tab, Key, {5,Pred})
 	    end,
-    io:format("Updated Pred ~p~n",[Pred]),
     {reply, Reply, Tab};
 
 handle_call({find,Key}, _From, Tab) ->
@@ -132,9 +131,8 @@ handle_call({find,Key}, _From, Tab) ->
 	 [{Key,Pid,_,_,_}] -> Pid
     end,
     {reply, Reply, Tab};
-handle_call({sync_send,Msg,Pred}, From, Tab) ->
+handle_call({send,Msg,Pred}, From, Tab) ->
     {Sender,_} = From,
-%    io:format("~p has ~p~n",[Sender,ets:match(?MODULE, {'_',Sender,'_','$1','_'})]),
     [[Env_sender]] = ets:match(?MODULE, {'_',Sender,'_','$1','_'}),
     Reply = send_all_env(?MODULE,Msg,Pred,Env_sender),
     {reply, Reply, Tab};
@@ -147,13 +145,6 @@ handle_call(stop, _From, Tab) ->
     ets:delete(Tab),
     {stop, normal, stopped, Tab}.
 
-
-%% Todo
-handle_cast({async_send,Msg,Pred}, Tab) ->
-%    {Sender,_} = From,
-%    [[Env_sender]] = ets:match(?MODULE, {'_',Sender,'_','$1','_'}),
-%    Reply = send_all_env(?MODULE,Msg,Pred,Env_sender),
-    {noreply, Tab};
 %handle_cast({asyn_send,Msg,Pred}, State) ->
 %    [[Env_sender]] = ets:match(?MODULE, {'_',Sender,'_','$1','_'}),
 %    send_all_env(?MODULE,Msg,Pred,Env_sender),
@@ -186,14 +177,12 @@ send_all_env(EtsIndex,Msg, Pred, Env) ->
 send_all_env(_, '$end_of_table', _, _,_) -> done;
 send_all_env(EtsIndex, NextKey, Msg, Ps, Envs) ->
     [{_,Pid,_,Envr,Pr}] = ets:lookup(EtsIndex, NextKey),
+%    io:format("Sender: ~p ~p, Receiver ~p ~p~n",[Pred_sender,Env_sender,Pred_receiver,Env_receiver]),
     case eval(Ps,Envr) andalso eval(Pr,Envs) of
 	true ->
-%	    io:format("Sender: ~p ~p, Receiver ~p ~p~n",[Ps,Envs,Pr,Envr]),
 %	    io:format("Gonna send ~p to ~p~n",[Msg,Pid]),
 	    Pid ! Msg;
-	false ->
-	    %io:format("Sender: ~p ~p, Receiver ~p ~p~n",[Ps,Envs,Pr,Envr]),
-	    void
+	false -> void
     end,
     send_all_env(EtsIndex, ets:next(EtsIndex, NextKey), Msg, Ps, Envs).
 
