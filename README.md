@@ -42,11 +42,12 @@ Then in the code, one process can send with predicate!. For example:
     to(Predicate) ! Msg
 That means, send message Msg to all processes whose attributes satisfy the predicate Predicate.
 
-### Attribute-based receive: you can declare a Predicate before Erlang receive construct. And use it to filter out all senders do not satisfy the predicate:
+### Attribute-based receive 
+You can declare a Predicate before Erlang receive construct. And use it to filter out all senders do not satisfy the predicate:
 
     from(Predicate),
     receive
         ....
     end.
-
+Whenever a from is used, it must be followed by a receive construct.
 ### See test and example folder for more details on how to use
