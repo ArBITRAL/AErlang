@@ -45,9 +45,11 @@ That means, send message Msg to all processes whose attributes satisfy the predi
 ### Attribute-based receive 
 You can declare a Predicate before Erlang receive construct. And use it to filter out all senders do not satisfy the predicate:
 
+    Predicate = "Color = red and Battery < 30",
     from(Predicate),
     receive
         ....
     end.
+    
 Whenever a from is used, it must be followed by a receive construct.
 See the test and example folder for more details on how to use
