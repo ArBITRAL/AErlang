@@ -8,6 +8,8 @@ AErlang is a middleware and an extension of Erlang concurrent constructs for ena
 * attribute-based receive: Similarly, a predicate at receiver side can be used to filter out uninteresting senders.
 
 ## How to use
+
+### Registering process's attribute environment
 Start AErlang in your application by calling function start/0 from aerlang module:
 
     aerlang:start().
@@ -20,9 +22,13 @@ Then each process needs to register their information by calling function regist
 
     aerlang:register(Key, Env).
     
+Key should be unique for each process.
+
 Processes can update their attribute values by calling update/2:
 
     aerlang:update(Key, Data).
 
 where Data has the similar form to Environment: [{'Attribute1', Value1},....].
-    
+
+### Attribute-based send
+In the module that you are going to use attribute-based send,  
