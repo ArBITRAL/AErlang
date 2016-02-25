@@ -31,4 +31,22 @@ Processes can update their attribute values by calling update/2:
 where Data has the similar form to Environment: [{'Attribute1', Value1},....].
 
 ### Attribute-based send
-In the module that you are going to use attribute-based send,  
+In the module that you are going to use attribute-based primitives, you should include the aerlang transformation module:
+
+    -module(test_AbC).
+    -compile({parse_transform, aerl_trans}).
+
+Then in the code, one process can send with predicate!. For example:
+
+    Predicate = "Battery > 30",
+    to(Predicate) ! Msg
+That means, send message Msg to all processes whose attributes satisfy the predicate Predicate.
+
+### Attribute-based receive: you can declare a Predicate before Erlang receive construct. And use it to filter out all senders do not satisfy the predicate:
+
+    from(Predicate),
+    receive
+        ....
+    end.
+
+### See test and example folder for more details on how to use
