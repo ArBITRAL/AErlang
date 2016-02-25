@@ -9,15 +9,20 @@ AErlang is a middleware and an extension of Erlang concurrent constructs for ena
 
 ## How to use
 Start AErlang in your application by calling function start/0 from aerlang module:
+
     aerlang:start().
 
-Erlang processes should define an attribute environment in the form of a list of 2-tuples, e.g:
+Erlang processes should define an attribute environment in the form of a list of 2-tuples, for example:
+
     Env = [{'Color', red},{'Role', explorer},{'Battery', 30}].
 
-Then each process needs to register their information by calling function register/2.
+Then each process needs to register their information by calling function register/2:
+
     aerlang:register(Key, Env).
     
-Process can update attribute values by calling update/2.
+Processes can update their attribute values by calling update/2:
+
     aerlang:update(Key, Data).
-    where Data has the similar form to Environment: [{'Attribute1', Value1},....].
+
+where Data has the similar form to Environment: [{'Attribute1', Value1},....].
     
