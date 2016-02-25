@@ -21,7 +21,8 @@ start() ->
     io:format("Start sending ...~n"),
     Id = ?NUM_PROCS * 2,
     Msg = {start_send, Id},
-    [Pid || Pid <- Pids, (Pid ! Msg) =:= Msg].
+    [Pid || Pid <- Pids, (Pid ! Msg) =:= Msg],
+    timer:sleep(2000).
 
 create_process(0,Pids) ->
     Pids;
@@ -59,7 +60,7 @@ loop2(Predicate) ->
 	{attribute_send, From} ->
 	    io:format("~p receives from ~p whose environment is ~p~n",[self(),From,aerlang:get_env_by_pid(From)]),
 	     loop2(Predicate)
-    after 5000
+    after 1000
 	      ->
 	    io:format("~p finishes receive~n",[self()])
 end.
