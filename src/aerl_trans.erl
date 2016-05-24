@@ -7,8 +7,9 @@
 -export([parse_transform/2]).
 
 parse_transform(Forms, _Options) ->
+    io:format("BEFORE~p~n", [Forms]),
     Forms1 = forms(Forms),
-%    io:format("AFTER~s~n", [erl_prettypr:format(erl_syntax:form_list(Forms1))]),
+    io:format("AFTER~s~n", [erl_prettypr:format(erl_syntax:form_list(Forms1))]),
     Forms1.
 
 %% forms(Fs) -> lists:map(fun (F) -> form(F) end, Fs).
@@ -338,17 +339,38 @@ grecord_inits([]) -> [].
 exprs([E0|Es]) ->
     case lists:any(fun ({call,_Line,{atom,_Line,from},_}) -> true; (_) -> false end,[E0]) of
 	false ->
-	   E1 = expr(E0),
-	   [E1|exprs(Es)];
+	   case lists:any(fun ({match,Line,PName,{call,Line,{atom,Line,predicate_marco__},[{string,Line,Pred}]}}) -> true; (_) -> false end,[E0]) of
+	       false ->
+		   E1 = expr(E0),
+		   [E1|exprs(Es)];
+	       true ->
+		   E1 = stringify_vars(E0),
+		   [E1|exprs(Es)]
+	   end;
 	true ->
 	    [H|T] = Es,
-%	    io:format("FIND with construct~p and ~p~n",[E0,H]),
-	    {E1,E2} = from_syntax(E0,H),
-	    [E1|[E2|exprs(T)]]
+	    io:format("FIND from construct~p and ~p~n",[E0,H]),
+	    E2 = from_syntax(E0,H),
+	    [E2|exprs(T)]
     end;
 
 exprs([]) -> [].
 
+stringify_vars({match,Line,PName,{call,Line,{atom,Line,predicate_marco__},[{string,Line,Pred}]}}) ->
+    Rx = "[\\$|\\?](\\w+)",
+    VarsNames = case re:run(Pred, Rx, [global, {capture, all_but_first, list}]) of
+        {match, Values} -> lists:concat(Values);
+        _Other -> []
+    end,
+    io:format("VARSNAMES ~p~n",[VarsNames]),
+    TupleFormCreator = fun(VarName) ->
+    {tuple,Line,[{atom,Line,list_to_atom(VarName)},{var,Line,list_to_atom(VarName)}]} end,
+    VarsForms = lists:map(TupleFormCreator, VarsNames),
+%    io:format("CONTENT~s~a",[VarsForms]),
+    _Addbindingscontent = cons_form(Line,VarsForms),
+    io:format("Pred ~p~n",[_Addbindingscontent]),
+    PredConverted = re:replace(Pred, "[$]", "", [global, {return, list}]),
+    {match,Line,PName,{tuple,Line,[_Addbindingscontent,{string,Line,PredConverted}]}}.
 
 %% from construct by
 %% expr({call, Line, {atom, _Line1, from},
@@ -356,13 +378,49 @@ exprs([]) -> [].
 from_syntax({call, Line, {atom, _, from}, [{_, _, Var}]}, ReceiveClause) ->
     %% with must be followed by receive clause
 %    io:format("Receive ~p~n",[ReceiveClause]),
-    case element(1,ReceiveClause) == 'receive' of
-	false -> throw({"A 'from' construct must be followed by receive",Line});
+     case element(1,ReceiveClause) == 'receive' of
+	false -> %transform error
+	     throw({"A 'from' construct must be followed by receive",Line});
 	true ->
-	  {{call,Line,
-       {remote,Line,{atom,Line,aerlang},{atom,Line,set_predicate}},
-	    [{call,Line,{atom,1,self},[]},{var,Line,Var}]}, expr(ReceiveClause)}
+	    case size(ReceiveClause) of
+		3 -> {'receive',_Line,C0} = ReceiveClause,
+		     {'receive',_Line,with_insert(C0,Var)};
+		5 -> {'receive',_Line,C0,To,Exp} = ReceiveClause,
+     		     {'receive',_Line,with_insert(C0,Var),To,Exp}
+            end
     end.
+
+with_insert([],_) -> [];
+with_insert([C0|Cs],Var) ->
+    io:format("Clause ~p~n",[C0]),
+    C1 = with_helper(C0,Var),
+    [C1 | with_insert(Cs,Var)].
+
+with_helper({clause,Line,[{tuple,_,From}]=Msg,Arr,Exp}=C,Var) ->
+    io:format("From ~p~n",[From]),
+    case lists:any(fun( {var,_,_} ) -> true; (_) -> false end, From) of
+	false -> C;
+	true ->
+	    {clause,Line,Msg,with_modify(Arr,Var),Exp}
+    end;
+with_helper({clause,Line,[{var,_,_}]=Msg,Arr,Exp},Var) ->
+    io:format("Message ~p~n",[Msg]),
+    {clause,Line,Msg,with_modify(Arr,Var),Exp};
+with_helper(C0,_Var) ->
+    io:format("Other case of Received Message??~p~n",[C0]),
+    C0.
+
+with_modify(_Arr,Var) ->
+
+    R = lists:flatten(io_lib:format("~p",[Var])),
+
+%    Pred = re:replace(R, "\'", "", [global, {return, list}]),
+ %   io:format("Code to insert ~p~n",[Var]),
+%    Str = "case aerlang:eval(" ++ Pred ++ ") of true -> " ++ string:join(OExp,",") ++ ";false -> void end.",
+    Str = Var,
+    io:format("Code to insert ~p~n",[Str]),
+    NewExp = forms:to_abstract(Str),
+    NewExp.
 
 %% -type expr(Expression) -> Expression.
 
@@ -490,11 +548,17 @@ expr({op,Line,Op,A0}) ->
     {op,Line,Op,A1};
 
 %% 'to' syntax processing
-%% to(Pred) ! Msg
-expr({op,Line,Op,{call, Line, {atom, Line, to},[Pred]},Content}) ->
-    {call,Line,
-       {remote,Line,{atom,Line,aerlang},{atom,Line,ssend}},
-       [Content,Pred]};
+%% to(Pred) ! {Msg,V}
+%expr({op,Line,'!',{call, Line, {atom, Line, to},[Pred]},{tuple, Line, Content}}) ->
+%    {call,Line,
+%       {remote,Line,{atom,Line,aerlang},{atom,Line,send}},
+%       [Pred | Content]};
+
+expr({op,Line,'!',{call, Line, {atom, Line, to},[Pred]},{tuple, Line, Content}}) ->
+  {call,Line,
+      {remote,Line,{atom,Line,aerlang},{atom,Line,send}},
+       [Pred | Content]};
+
 
 %expr({op,Line,Op,{call, Line, {atom, Line, s_to},[Pred]},Content}) ->
 %    {call,Line,
@@ -570,3 +634,12 @@ fun_clauses([C0|Cs]) ->
     C1 = clause(C0),
     [C1|fun_clauses(Cs)];
 fun_clauses([]) -> [].
+
+
+%% my helper functions
+
+cons_form(Line, []) ->
+    {nil, Line};
+
+cons_form(Line, [First | Rest]) ->
+    {cons, Line, First, cons_form(Line, Rest)}.
