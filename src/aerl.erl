@@ -1,4 +1,3 @@
-%% This initial implementation is for broadcast mode
 -module(aerl).
 -behaviour(gen_server).
 
@@ -15,9 +14,14 @@ start(Mode) when Mode==broadcast;Mode==push;Mode==pull ->
 
 stop() -> gen_server:call(?MODULE, stop).
 
-register(Meta) ->
-%        io:format("register command Pid ~p~n",[self()]),
-        gen_server:call(?MODULE, {new, Meta}).
+register(Environment) ->
+    initEnv(Environment),
+    gen_server:call(?MODULE, {new, Environment}).
+
+register(Pid, Environment) ->
+    initEnv(Environment),
+    gen_server:call(?MODULE, {new, Pid, Environment}).
+
 unregister(Key) -> gen_server:call(?MODULE, {remove, Key}).
 
 %% Asynchronous update attributes
@@ -30,7 +34,13 @@ supdate(Key, NewMeta) ->
 
 %% Update predicate by Pid
 update_pred(Pred) ->
-    gen_server:call(?MODULE, {update_pred, Pred}).
+    case mode() of
+	pull -> gen_server:call(?MODULE, {update_pred, Pred});
+	_ -> ok
+    end.
+
+mode() ->
+    gen_server:call(?MODULE,mode).
 
 %% addtional functionallity
 %register_with_pid(Key,Pid, Meta) -> gen_server:call(?MODULE, {new, Key, Pid, Meta}).
@@ -49,13 +59,34 @@ find_key(Pid) ->
 	_ -> Result
     end.
 
-mode() ->
-    gen_server:call(?MODULE,mode).
-
 %% Asynchronous (default)
-send(Pred,Msg,V) ->
+send(Pred,Msg) ->
+    Env = get(),
     Pid = self(),
-    gen_server:cast(?MODULE, {async_send, Pred, Msg, V, Pid}).
+    V = [],
+    %io:format("Going aerl send"),
+    case is_tuple(Pred) of
+	true -> {Bind,_Ps} = Pred,
+		Ps = evallp(_Ps,Env),
+		%io:format("~p is gonna send with ~p, ~p, ~p~n",[Pid,Msg,Ps,Bind]),
+		gen_server:cast(?MODULE, {async_send, Ps, Msg, Bind, Env, Pid});
+	false -> % io:format("~p is gonna send with ~p, ~p~n",[Pid,Pred,V]),
+	    Ps = evallp(Pred,Env),
+	    gen_server:cast(?MODULE, {async_send, Ps, Msg, V, Env, Pid})
+    end.
+%% send(Pred,Msg,Env) ->
+%%     Pid = self(),
+%%     V = [],
+%%     %io:format("Going aerl send"),
+%%     case is_tuple(Pred) of
+%% 	true -> {Bind,_Ps} = Pred,
+%% 		Ps = evallp(_Ps,Env),
+%% 		%io:format("~p is gonna send with ~p, ~p, ~p~n",[Pid,Msg,Ps,Bind]),
+%% 		gen_server:cast(?MODULE, {async_send, Ps, Msg, Bind, Env, Pid});
+%% 	false -> % io:format("~p is gonna send with ~p, ~p~n",[Pid,Pred,V]),
+%% 	    Ps = evallp(Pred,Env),
+%% 	    gen_server:cast(?MODULE, {async_send, Ps, Msg, V, Env, Pid})
+%%     end.
 
 %% Synchronous
 ssend(Msg,Pred) ->
@@ -81,6 +112,17 @@ handle_call({new, Meta}, {Pid,_Tag}, {Tab,_}=State) ->
 	    end,
     {reply, Reply, State};
 
+handle_call({new, Pid, Meta}, _From, {Tab,_}=State) ->
+    Predicate = "ff",
+    Reply = case ets:lookup(Tab, Pid) of
+		[]  ->
+		    Ref = erlang:monitor(process, Pid),
+%		    io:format("Register infor ~p,~p,~p,~p~n",[Pid,Ref,Meta,Predicate]),
+		    ets:insert(Tab, {Pid, Ref, Meta, Predicate});
+		[_] -> {already_registered}
+	    end,
+    {reply, Reply, State};
+
 handle_call({update_att,Key,NewMeta}, _From, {Tab,_}=State) ->
     Reply = case ets:lookup_element(Tab, Key, 4) of
 		[]  -> not_registered;
@@ -91,7 +133,7 @@ handle_call({update_att,Key,NewMeta}, _From, {Tab,_}=State) ->
 	    end,
     {reply, Reply, State};
 
-handle_call({update_pred, Pred}, From, {Tab,Mode}=State) when Mode == pull ->
+handle_call({update_pred, Pred}, From, {Tab,_}=State) ->
     spawn(fun() -> update_handler(Pred,From,Tab) end),
     {noreply, State};
 
@@ -106,9 +148,9 @@ handle_call(stop, _From, {Tab,_}=State) ->
     ets:delete(Tab),
     {stop, normal, stopped, State}.
 
-handle_cast({async_send,Pred,Msg,V,Pid}, {Tab,Mode}=State) ->
+handle_cast({async_send,Pred,Msg,V,Env,Pid}, {Tab,Mode}=State) ->
     case Mode of
-	broadcast -> spawn(fun() -> broadcast(?MODULE,Msg,Pred,V,Pid) end);
+	broadcast -> spawn(fun() -> broadcast(?MODULE,Msg,Pred,V,Env,Pid) end);
 	push ->
 	    spawn(fun() -> pushing(?MODULE,Msg,Pred,V,Pid) end);
 	pull ->
@@ -145,23 +187,24 @@ update_handler(Pred, {Pid,_}=From, Tab) ->
 
 
 %% broadcast mode
-broadcast(EtsIndex,Msg, Pred, Env, Pid) ->
+broadcast(EtsIndex,Msg, Pred, Bind, Env, Pid) ->
     L = ets:select(EtsIndex,[{{'$1','_','_','_'},[{'=/=','$1',Pid}],['$1']}]),
-    [P || P <- L, (P ! {Pred,Msg,Env}) =:= {Pred,Msg,Env}].
-
-%% pulling mode
-pulling(EtsIndex,Msg,Pred,Env,Pid) ->
-    L = ets:select(EtsIndex,[{{'$1','_','_','$2'},[{'=/=','$1',Pid}],['$$']}]),
-    lists:foreach(fun([P,Pr]) -> case check_pred(Pr,Env) of
-	true -> P ! {Pred,Msg,Env};
-	false -> ok
-    end end, L).
+%    [P || P <- L, (P ! {Pred,Msg,Env}) =:= {Pred,Msg,Env}].
+    [P || P <- L, (P ! {Pred,Msg,Bind,Env}) =:= {Pred,Msg,Bind,Env}].
 
 %% pushing mode
 pushing(EtsIndex,Msg, Pred, Envs, Pid) ->
     L = ets:select(EtsIndex,[{{'$1','_','$2','_'},[{'=/=','$1',Pid}],['$$']}]),
-    lists:foreach(fun([P,Env]) -> case check_pred(Pred,Env) of
-	true -> P ! {Pred,Msg,Envs};
+    lists:foreach(fun([P,Env]) -> case check_spred(Pred,Env) of
+	true -> P ! {"tt",Msg,Envs};
+	false -> ok
+    end end, L).
+
+%% pulling mode
+pulling(EtsIndex,Msg,Pred,Env,Pid) ->
+    L = ets:select(EtsIndex,[{{'$1','_','_','$2'},[{'=/=','$1',Pid}],['$$']}]),
+    lists:foreach(fun([P,Pr]) -> case check_rpred(Pr,Env) of
+	true -> P ! {Pred,Msg,Env};
 	false -> ok
     end end, L).
 
@@ -200,21 +243,20 @@ capfirst(Other) ->
     Other.
 
 %% Evaluate a string containing an Erlang Experssion
--spec check_pred(Pi::string(), Er::map() | list()) -> boolean().
-check_pred(Pi,Er) ->
-    Meta1 = if is_map(Er) -> maps:to_list(Er);
-	      true -> Er
-	    end,
-    Meta = lists:map(
-	     fun({X,Y}) -> {list_to_atom(capfirst(atom_to_list(X))),Y} end,
-	     Meta1),
-
+-spec check_spred(Pi::string(), Er::map() | list()) -> boolean().
+check_spred(Pi,Er) ->
     case Pi of
 	"tt" -> true;
 	"ff" -> false;
 	_Other ->
+	    Meta1 = if is_map(Er) -> maps:to_list(Er);
+		       true -> Er
+		    end,
+	    Meta = lists:map(
+		     fun({X,Y}) -> {list_to_atom(capfirst(atom_to_list(X))),Y} end,
+		     Meta1),
 	    case Meta of
-		[] -> false;
+		[] -> true;
 		_ ->
 		    {ok,Scanned,_} = erl_scan:string(pred(Pi)),
     		    %% io:format("Parsed ~p~n",[Scanned]),
@@ -231,18 +273,144 @@ check_pred(Pi,Er) ->
 	    end
     end.
 
+
+
+-spec check_spred2(Pi::string(), Bind::list()) -> boolean().
+check_spred2(Pi,Bind) ->
+    Er = getEnv(),
+%    io:format("Check Ps ~p for ~p with Er ~p and Bind ~p~n",[Pi,self(),Er,Bind]),
+    case Pi of
+	"tt" -> true;
+	"ff" -> false;
+	_Other ->
+	    Meta1 = if is_map(Er) -> maps:to_list(Er);
+		       true -> Er
+		    end,
+	    Meta = lists:map(
+		     fun({X,Y}) -> {list_to_atom(capfirst(atom_to_list(X))),Y} end,
+		     Meta1++Bind),
+	    %io:format("META1++ is ~p~n",[Meta1++Bind]),
+	    %io:format("META is ~p~n",[Meta]),
+	    case Meta of
+		[] -> true;
+		_ ->
+		    {ok,Scanned,_} = erl_scan:string(pred(Pi)),
+    		    %io:format("New Predicate ~p~n",[pred(Pi)]),
+		    {ok,Parsed} = erl_parse:parse_exprs(Scanned),
+		    Env = lists:foldl(fun({K,V}, Bindings) ->
+			      erl_eval:add_binding(K, V, Bindings) end,
+		      erl_eval:new_bindings(), Meta),
+    		    %% io:format("Parsed ~p~n",[Parsed]),
+		    try erl_eval:exprs(Parsed,Env) of
+			{value,Result,_} -> %io:format("Result Ps for ~p is ~p~n",[self(),Result]),
+					    Result
+		    catch
+			error:_ -> %io:format("Result false Ps ~n"),
+			    false
+		    end
+	    end
+    end.
+
+
+-spec check_rpred(Pi::string(), Er::map() | list()) -> boolean().
+check_rpred(Pi,Er) ->
+    case Pi of
+	"tt" -> true;
+	"ff" -> false;
+	_Other ->
+	    Meta1 = if is_map(Er) -> maps:to_list(Er);
+		       true -> Er
+		    end,
+	    Meta = lists:map(
+		     fun({X,Y}) -> {list_to_atom(capfirst(atom_to_list(X))),Y} end,
+		     Meta1),
+	    case Meta of
+		[] -> true;
+		_ ->
+		    {ok,Scanned,_} = erl_scan:string(pred(Pi)),
+    		    %% io:format("Parsed ~p~n",[Scanned]),
+		    {ok,Parsed} = erl_parse:parse_exprs(Scanned),
+		    Env = lists:foldl(fun({K,V}, Bindings) ->
+			      erl_eval:add_binding(K, V, Bindings) end,
+		      erl_eval:new_bindings(), Meta),
+    		    %% io:format("Parsed ~p~n",[Parsed]),
+		    try erl_eval:exprs(Parsed,Env) of
+			{value,Result,_} -> Result
+		    catch
+			error:_ -> false
+		    end
+	    end
+    end.
+
+
+pred2(Pi) ->
+    {ok,T,_} = erl_scan:string(Pi),
+    lists:foldl(fun(X,New) ->
+			case X of
+			    {var,_,Some} -> [Some] ++ New ;
+			    _ -> New
+			end
+		end,[], T).
+
+
+-spec check_rpred2(P::string(), Bind::list(), Envs::map() | list()) -> boolean().
+check_rpred2(P,Bind,Envs) ->
+    case P of
+	"tt" -> true;
+	"ff" -> false;
+	_Other ->
+	    if is_tuple(P) ->
+		    {B,Pr} = P;
+	       true -> Pr = P, B = []
+	    end,
+	    Meta1 = if is_map(Envs) -> maps:to_list(Envs);
+		       true -> Envs
+		    end,
+	    Meta = lists:map(
+		     fun({X,Y}) -> {list_to_atom(capfirst(atom_to_list(X))),Y} end,
+		     Meta1),
+	    Bind1 = lists:merge(Meta,Bind) ++ B,
+%	    io:format("Check Receiving Predicate ~p for ~p with Bind ~p~n",[pred(Pr),self(),Bind1]),
+	    case Bind1 of
+		[] -> true;
+		_ ->
+		    {ok,Scanned,_} = erl_scan:string(pred(Pr)),
+		    {ok,Parsed} = erl_parse:parse_exprs(Scanned),
+		    Env = lists:foldl(fun({K,V}, Bindings) ->
+			      erl_eval:add_binding(K, V, Bindings) end,
+		      erl_eval:new_bindings(), Bind1),
+    		     %io:format("Parsed vs Env ~p ~p~n",[Parsed,Env]),
+		    try erl_eval:exprs(Parsed,Env) of
+			{value,Result,_} -> %io:format("Result Pr for ~p is ~p~n",[self(),Result]),
+					    Result
+		    catch
+			error:_ -> %io:format("Result Pr false ~n"),
+				   false
+		    end
+	    end
+    end.
+
+
 % the evaluation of predicate P on the local environment Env
--spec evallp(P::string(),E::[X]) -> P1::string() when X::tuple().
+-spec evallp(P::string() | tuple(),E::[X]) -> P1::string() | tuple() when X::tuple().
+evallp({B,P},E) ->
+    L = re:split(P,"\s",[{return,list}]),
+    L1 = [case string:left(X,5) == "this." of
+	      true ->
+		  Key = re:replace(X,"this.","",[{return,list}]),
+		  lists:flatten(io_lib:format("~p", [get(list_to_atom(Key))]));
+	      false -> X end || X <-L],
+    {B,string:join(L1," ")};
 evallp(P,E) ->
     L = re:split(P,"\s",[{return,list}]),
     L1 = [case string:left(X,5) == "this." of
 	      true ->
 		  Key = re:replace(X,"this.","",[{return,list}]),
-		  lists:flatten(io_lib:format("~p", [maps:get(list_to_atom(Key),E)]));
+		  lists:flatten(io_lib:format("~p", [get(list_to_atom(Key))]));
 	      false -> X end || X <-L],
     string:join(L1," ").
 
-% the evaluation of expression V on the local environment Env
+% the evaluation of expressions V on the local environment Env
 -spec evalle(V::tuple(),E::map()) -> V1::list(X) when X::tuple().
 evalle(V,E) ->
     [case string:left(X,5) == "this." of
@@ -250,3 +418,54 @@ evalle(V,E) ->
 		 Key = list_to_atom(re:replace(X,"this.","",[{return,list}])),
 		 {Key,maps:get(Key,E)};
 	     false -> {X,X} end || X <- tuple_to_list(V)].
+
+
+%% Pr is receiving predicate
+%% Msg is a tuple of pair containing variable bindings transformed from the receving message in user code
+%% aerl_broadcast_receive(Pr,Env) ->
+%%     receive
+%% 	{_Ps, Msg, _Bind, _Envs} ->
+%%     		       case check_spred2(_Ps, Env, _Bind) andalso
+%% 			   check_rpred2(Pr,,_Envs)
+%%     			   of
+%% 			   true ->
+%% 			       self() ! Msg;
+%% 			   false -> aerl_broadcast_receive(Pr,Env)
+%%     		       end
+%%     end.
+
+flush() ->
+        receive
+                _ -> flush()
+        after
+                0 -> ok
+        end.
+
+%%%%% Functions to handle Evnvironment
+-spec setAtt(atom(),term()) -> atom().
+setAtt(Attribute,Value) ->
+    put(Attribute,Value).
+
+-spec setAtts(list()) -> atom().
+setAtts(List) ->
+    lists:foreach(fun({A,V}) -> put(A,V) end,List).
+
+-spec getAtt(atom()) -> term().
+getAtt(Attribute) ->
+    get(Attribute).
+
+-spec getAtts(list()) -> list().
+getAtts(AttributeList) ->
+    lists:foldr(fun(A,Result) -> [get(A) | Result] end, [], AttributeList).
+
+-spec getEnv() -> list().
+getEnv() ->
+    get().
+
+-spec initEnv(list()) -> ok.
+initEnv(Env) ->
+    case is_map(Env) of
+	true -> Tmp = maps:to_list(Env);
+	false -> Tmp = Env
+    end,
+    lists:foreach(fun({A,V}) -> setAtt(A,V) end,Tmp).
