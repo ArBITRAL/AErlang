@@ -1,0 +1,3 @@
+Separate aerl client vs server functionalities
+Replace ETS by mnesia
+more examples + tests
