@@ -67,7 +67,7 @@ See the example folder for case studies and details on how to use.
 ### Other features:
 ####Receiving predicates can be over elements of message itself (similar to selective receive):
     
-    Predicate = "$Money > 100 and battery < 30",
+    Predicate = "$Money > 100 and id = tom",
     from(Predicate),
     receive
         {Money,Y} -> do_work
