@@ -1,0 +1,13 @@
+-module(test1).
+-compiler(export_all).
+
+start() ->
+    spawn(fun() ->
+		  loop() end).
+
+loop() ->
+    receive
+	{get, X} -> receive {set, Y} when (X == Y) -> {found, X} end;
+
+	{set, X} -> receive {get, Y} when (X == Y) -> {found, X} end
+    end.

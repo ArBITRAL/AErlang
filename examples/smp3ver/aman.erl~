@@ -1,0 +1,44 @@
+-module(aman).
+-compile({parse_transform,aerl_trans}).
+-compile(export_all).
+
+% AbC code for Man
+% M := [partner:=top[preference];preference:=preference.tail](propose,this.mid)@(wid=partner).(x=invalid)(x).M
+% using map to store environment
+
+init(Env) ->
+    spawn(fun() ->
+		  start(Env) end).
+start(Env) ->
+    aerl:register(Env),
+    io:format("Man <~p> ~p start!~n",[self(),maps:get(id,Env)]),
+    loop(Env).
+
+loop(Env) ->
+	#{prefs:=L, id:=Id, body:=Body, wealth:=Wealth,
+	predicate:=Predicate, refusal:=Refusal} = Env,
+	[H|T] = Predicate,
+	case Refusal of
+		[] -> Ps = H;
+		_ -> Ps = string:concat(H, refuse_pred(Refusal))
+	end,
+	to(Ps) ! {{propose, Id, Wealth, Body}, Env},
+	from("X = yes or X = no"), receive
+	{X, Wid} ->
+		case X of
+			yes ->
+				from("Y = no"), receive
+				{Y, Wid} ->
+					loop(Env#{predicate:=T, refusal:=refuse_list(Wid,Refusal)})
+				end;
+			no ->
+		 		loop(Env#{predicate:=T, refusal:=refuse_list(Wid,Refusal)})
+		end
+	end.
+
+refuse_list(L1,L2) ->
+    L = lists:merge([L1],L2),
+    lists:usort(L).
+
+refuse_pred(L) ->
+    lists:foldl(fun(X, Sum) -> " and id =/= " ++ atom_to_list(X) ++ Sum end, "", L).

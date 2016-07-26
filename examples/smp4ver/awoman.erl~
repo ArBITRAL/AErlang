@@ -1,0 +1,56 @@
+-module(awoman).
+-compile({parse_transform,aerl_trans}).
+-compile(export_all).
+
+% AbC code for woman
+% W:= (x=propose)(x,y).(<BOF(this.partner,y)>[this.ex:=this.partner;this.partner:=y](invalid)@(mid=this.ex).0
+% + <not BOF(this.partner,y)>(invalid)@(mid=y).0).W
+%
+
+% using map to store environment
+
+init(Env) ->
+    spawn(fun() ->
+		  start(Env) end).
+
+start(Env) ->
+    aerl:register(Env),
+    io:format("Woman <~p> ~p start!~n",[self(),maps:get(id,Env)]),
+    loop(Env).
+
+loop(Env) ->
+    io:format("Woman ~p has current partner ~p with score ~p~n",[maps:get(id,Env),maps:get(partner,Env),maps:get(wpartner,Env)]),
+    #{prefs := L, partner := Partner, id := Id, wpartner := Param} = Env,
+    Pr = "x = propose",
+    from(Pr),
+    receive
+	{X,Man,W,B} ->
+	    case bof(L, Param, W, B) of
+		{true,Score} ->
+		  %  io:format("[trade up] Woman ~p replaces Man ~p by Man ~p with score ~p,~n",[Id,Partner,Man,Score]),
+		     NEnv = Env#{ex := Partner, partner := Man, wpartner := Score},
+		     Pex = "id = this.ex",
+		     to(Pex) ! {{no, Id},NEnv},
+		     io:format("Woman ~p says yes to ~p~n",[Id,Man]),
+		     Pcp = "id = this.partner",
+		     to(Pcp) ! {{yes, Id},NEnv},
+		     loop(NEnv);
+		{false,_} ->
+		    PP = predicate_marco__("id = $Man"),
+		    to(PP) ! {{no, Id},Env},
+		    io:format("Woman ~p rejects Man ~p~n",[Id,Man]),
+		    loop(Env)
+	    end
+    end.
+
+
+%bof(_, -1, _ , _) -> {true,-1};
+bof(L, Param, W, B) ->
+  #{wealth := X, body := Y} = L,
+  Score = case {X,Y} of
+      {W,B} -> 3;
+      {W,_} -> 2;
+      {_,B} -> 1;
+      _Other ->0
+  end,
+  {Score > Param,Score}.
