@@ -12,23 +12,28 @@ AErlang is a middleware and an extension of Erlang concurrent constructs for ena
 ### Registering process's attribute environment
 Start AErlang in your application by calling function start/0 from aerlang module:
 
-    aerlang:start().
+    aerl:start(Mode).
 
-Erlang processes should define an attribute environment in the form of a list of 2-tuples, for example:
+Erlang processes should define an attribute environment in the form of either a list of 2-tuples or a map, for example:
 
     Env = [{'Color', red},{'Role', explorer},{'Battery', 30}].
 
-Then each process needs to register their information by calling function register/2:
+Each process needs to register their information by calling function register/1:
 
-    aerlang:register(Key, Env).
-    
-Key should be unique for each process.
+    aerl:register(Env).
 
-Processes can update their attribute values by calling update/2:
+Registration can also be done by other process invoking function register/2:
 
-    aerlang:update(Key, Data).
+    aerl:register(Pid,Env).    
 
-where Data has the similar form to Environment: [{'Attribute1', Value1},....].
+Processes can handle their attribute environment via setter and getter functions:
+
+    aerl:setAtt(Name,Value).
+    aerl:getAtt(Name).
+    aerl:setAtts(TupleList).
+    aerl:getAtts(NameList).
+
+where TupleList has the similar form to Environment: [{'Attribute1', Value1},....].
 
 ### Attribute-based send
 In the module that you are going to use attribute-based primitives, you should include the aerlang transformation module:
@@ -36,20 +41,37 @@ In the module that you are going to use attribute-based primitives, you should i
     -module(test_AbC).
     -compile({parse_transform, aerl_trans}).
 
-Then in the code, one process can send with predicate!. For example:
+In the code, one process can send with predicates over attributes of registrated processes!. For example:
 
-    Predicate = "Battery > 30",
+    Predicate = "battery > 30",
     to(Predicate) ! Msg
-That means, send message Msg to all processes whose attributes satisfy the predicate Predicate.
+That means, send the message Msg to all processes whose attributes satisfy the predicate Predicate.
+Predicates can be over user's variables using a prefix symbol $, provided that variables are declared in the same scope with predicates, e.g.,:
+    
+    X = 30,
+    Ps = "battery > $X",
+    to(Ps) ! content.
 
 ### Attribute-based receive 
 You can declare a Predicate before Erlang receive construct. And use it to filter out all senders do not satisfy the predicate:
 
-    Predicate = "Color = red and Battery < 30",
+    Predicate = "color = red and battery < 30",
     from(Predicate),
     receive
         ....
     end.
+Note that whenever a attribute-based receive is used, "from" must be followed by a "receive" construct.
+
+
+
+### Other feature:
+
+Receiving predicates can be over elements of message itself (similar to selective receive):
     
-Whenever a from is used, it must be followed by a receive construct.
-See the test and example folder for more details on how to use
+    Predicate = "$Money > 100 and battery < 30",
+    from(Predicate),
+    receive
+        {Money,Y} -> do_work
+    end.
+    
+See the example folder for case studies and details on how to use
