@@ -38,7 +38,7 @@ where TupleList has the similar form to Environment: [{'Attribute1', Value1},...
 ### Attribute-based send
 In the module that you are going to use attribute-based primitives, you should include the aerlang transformation module:
 
-    -module(test_AbC).
+    -module(...).
     -compile({parse_transform, aerl_trans}).
 
 In the code, one process can send with predicates over attributes of registrated processes!. For example:
@@ -65,7 +65,7 @@ Note that whenever a attribute-based receive is used, "from" must be followed by
 See the example folder for case studies and details on how to use.
 
 ### Other features:
-#Receiving predicates can be over elements of message itself (similar to selective receive):
+####Receiving predicates can be over elements of message itself (similar to selective receive):
     
     Predicate = "$Money > 100 and battery < 30",
     from(Predicate),
@@ -73,7 +73,7 @@ See the example folder for case studies and details on how to use.
         {Money,Y} -> do_work
     end.
 
-#Function start/1 can accept two other operation mode instead of broadcast
-- pushing: It keep process attributes updating whenver processes update their environment. AErlang then select early the interested group of receivers
-- pulling: It updates the receiving predicate to AErlang so that AErlang can filter early interested senders.
+####Function start/1 can accept two other operation mode instead of broadcast
+- pushing: It keeps tracks of process attribute values whenver processes update their environments. AErlang preselects the interested groups of receivers.
+- pulling: It keeps tracks of receiving predicates. AErlang preselects the interested groups of senders.
 
