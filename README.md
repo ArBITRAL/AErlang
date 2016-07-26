@@ -12,7 +12,7 @@ AErlang is a middleware and an extension of Erlang concurrent constructs for ena
 ### Registering process's attribute environment
 Start AErlang in your application by calling function start/0 from aerlang module:
 
-    aerl:start(Mode).
+    aerl:start(broadcast).
 
 Erlang processes should define an attribute environment in the form of either a list of 2-tuples or a map, for example:
 
@@ -62,16 +62,18 @@ You can declare a Predicate before Erlang receive construct. And use it to filte
     end.
 Note that whenever a attribute-based receive is used, "from" must be followed by a "receive" construct.
 
+See the example folder for case studies and details on how to use.
 
-
-### Other feature:
-
-Receiving predicates can be over elements of message itself (similar to selective receive):
+### Other features:
+#Receiving predicates can be over elements of message itself (similar to selective receive):
     
     Predicate = "$Money > 100 and battery < 30",
     from(Predicate),
     receive
         {Money,Y} -> do_work
     end.
-    
-See the example folder for case studies and details on how to use
+
+#Function start/1 can accept two other operation mode instead of broadcast
+- pushing: It keep process attributes updating whenver processes update their environment. AErlang then select early the interested group of receivers
+- pulling: It updates the receiving predicate to AErlang so that AErlang can filter early interested senders.
+
