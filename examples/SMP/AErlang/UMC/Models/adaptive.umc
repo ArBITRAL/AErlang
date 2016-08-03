@@ -237,14 +237,3 @@ Abstractions {
    State m4.partner=$1 -> m4($1)
    State MB.stable=$1 -> stable($1)
 }
-
-
---- Algorithm terminate
---- AF AG FINAL
-
---- All people are engaged
---- AF AG (~ w1(null) and ~ w2(null) and ~ w3(null) and ~ w4(null) and ~ m1(null) and ~ m2(null) and ~  m3(null) and ~ m4(null))
-
-
---- The matching is stable
---- AF AG (~ w1(null) and ~ w2(null) and ~ w3(null) and ~ w4(null) and ~ m1(null) and ~ m2(null) and ~ m3(null) and ~ m4(null) and stable(true))
