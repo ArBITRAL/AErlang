@@ -1,4 +1,4 @@
 
-This example has extended the Erlang code of cache 
+This example has extended the Erlang code of concurrent caching 
 (which can be found at http://www.duomark.com/erlang/code/icfp2006/cache.tar.gz) 
 with replacement algorithms relying on process attributes
