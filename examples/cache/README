@@ -1,0 +1,4 @@
+
+This example shows how to implement cache replacement in AErlang.
+
+The Erlang implementation of the cache can be found at:  http://www.duomark.com/erlang/code/icfp2006/cache.tar.gz
