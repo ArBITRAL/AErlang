@@ -1,4 +1,4 @@
 
-This example has augmented the Erlang code base of the cache 
-(can be found at http://www.duomark.com/erlang/code/icfp2006/cache.tar.gz) 
-with the implementation of cache replacement relying on attributes
+This example has extended the Erlang code of cache 
+(which can be found at http://www.duomark.com/erlang/code/icfp2006/cache.tar.gz) 
+with replacement algorithms relying on process attributes
