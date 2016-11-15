@@ -1,0 +1,4 @@
+{"src/*", [debug_info, {outdir, "ebin"}, {i, "include"}]}.
+{"examples/esmp/*", [debug_info, {outdir, "ebin"}, {i, "include"}]}.
+{"examples/smp1/*", [debug_info, {outdir, "ebin"}, {i, "include"}]}.
+{"examples/psmp/*", [debug_info, {outdir, "ebin"}, {i, "include"}]}.

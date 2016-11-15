@@ -1,0 +1,24 @@
+-module(global_bench).
+-behaviour(process_registry_bench).
+
+-export([init/0]).
+-export([register/2, unregister/2]).
+-export([retrieve/1]).
+-export([process_loop/0]).
+
+init() ->
+	ok.
+
+register(Key, Pid) ->
+	yes = global:register_name(Key, Pid).
+
+unregister(Key, _Pid) ->
+	global:unregister_name(Key).
+
+retrieve(Key) ->
+	global:whereis_name(Key).
+
+process_loop() ->
+	receive
+		_ -> ok
+	end.
