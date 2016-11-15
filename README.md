@@ -10,7 +10,7 @@ AErlang is a middleware and an extension of Erlang concurrent constructs for ena
 ## How to use
 
 ### Registering process's attribute environment
-Start AErlang in your application by calling function start/1 from aerlang module:
+Start AErlang in your application by calling function start/0 from aerlang module:
 
     aerl:start().
 
