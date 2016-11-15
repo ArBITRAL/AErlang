@@ -12,9 +12,11 @@ AErlang is a middleware and an extension of Erlang concurrent constructs for ena
 ### Registering process's attribute environment
 Start AErlang in your application by calling function start/1 from aerlang module:
 
-    aerl:start(broadcast).
+    aerl:start().
 
-Erlang processes should define an attribute environment in the form of either a list of 2-tuples or a map, for example:
+This will start mnesia first and then aerlang
+
+AErlang processes are normal Erlang one but they need an attribute environment in the form of either a proper list or a map, for example:
 
     Env = [{'Color', red},{'Role', explorer},{'Battery', 30}].
 
@@ -35,8 +37,17 @@ Processes can handle their attribute environment via setter and getter functions
 
 where TupleList has the similar form to Environment: [{'Attribute1', Value1},....].
 
+### Attributes
+Attributes are Erlang atoms
+Attribute values can be one of the followings data types: atom(), number(), list()
+
+### Predicates
+
+In general, predicates are boolean expressions over attributes. 
+
+
 ### Attribute-based send
-In the module that you are going to use attribute-based primitives, you should include the aerlang transformation module:
+In the module that you are going to use attribute-based primitives, you include the aerlang transformation module:
 
     -module(...).
     -compile({parse_transform, aerl_trans}).
