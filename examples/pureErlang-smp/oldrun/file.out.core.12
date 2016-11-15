@@ -1,0 +1,454 @@
+Exec: /home/tduong/pureErlang-smp/rel/psmp/erts-8.1/bin/erlexec  -boot /home/tduong/pureErlang-smp/rel/psmp/releases/1/psmp -mode embedded -config /home/tduong/pureErlang-smp/rel/psmp/releases/1/sys.config -args_file /home/tduong/pureErlang-smp/rel/psmp/releases/1/vm.args -- console
+Root: /home/tduong/pureErlang-smp/rel/psmp
+Data Path is "/home/tduong/pureErlang-smp/rel/psmp/lib/psmp-0.1/priv/size-1000/" 
+IO time=110.824 miliseconds
+
+ ======= Run 50: =========
+Woman 1000
+Man 1000
+Init time=54.363 miliseconds
+Matching 
+. Size 999
+Stable true 
+Computation time=115.952 miliseconds
+
+ ======= Run 49: =========
+Woman 1000
+Man 1000
+Init time=108.404 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=107.40000000000009 miliseconds
+
+ ======= Run 48: =========
+Woman 1000
+Man 1000
+Init time=124.776 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=125.91300000000001 miliseconds
+
+ ======= Run 47: =========
+Woman 1000
+Man 1000
+Init time=94.06 miliseconds
+Matching 
+. Size 999
+Stable true 
+Computation time=97.01700000000005 miliseconds
+
+ ======= Run 46: =========
+Woman 1000
+Man 1000
+Init time=94.17 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=119.0809999999999 miliseconds
+
+ ======= Run 45: =========
+Woman 1000
+Man 1000
+Init time=105.281 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=95.80799999999999 miliseconds
+
+ ======= Run 44: =========
+Woman 1000
+Man 1000
+Init time=99.178 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=153.87799999999993 miliseconds
+
+ ======= Run 43: =========
+Woman 1000
+Man 1000
+Init time=99.562 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=113.49900000000002 miliseconds
+
+ ======= Run 42: =========
+Woman 1000
+Man 1000
+Init time=100.684 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=96.47700000000009 miliseconds
+
+ ======= Run 41: =========
+Woman 1000
+Man 1000
+Init time=117.823 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=105.49099999999999 miliseconds
+
+ ======= Run 40: =========
+Woman 1000
+Man 1000
+Init time=124.188 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=122.67200000000003 miliseconds
+
+ ======= Run 39: =========
+Woman 1000
+Man 1000
+Init time=118.392 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=119.78099999999995 miliseconds
+
+ ======= Run 38: =========
+Woman 1000
+Man 1000
+Init time=118.819 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=106.904 miliseconds
+
+ ======= Run 37: =========
+Woman 1000
+Man 1000
+Init time=106.364 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=130.0719999999999 miliseconds
+
+ ======= Run 36: =========
+Woman 1000
+Man 1000
+Init time=122.739 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=140.7460000000001 miliseconds
+
+ ======= Run 35: =========
+Woman 1000
+Man 1000
+Init time=97.287 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=151.93100000000004 miliseconds
+
+ ======= Run 34: =========
+Woman 1000
+Man 1000
+Init time=93.186 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=153.77099999999996 miliseconds
+
+ ======= Run 33: =========
+Woman 1000
+Man 1000
+Init time=114.237 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=138.6980000000001 miliseconds
+
+ ======= Run 32: =========
+Woman 1000
+Man 1000
+Init time=94.392 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=132.51800000000003 miliseconds
+
+ ======= Run 31: =========
+Woman 1000
+Man 1000
+Init time=103.313 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=132.6210000000001 miliseconds
+
+ ======= Run 30: =========
+Woman 1000
+Man 1000
+Init time=102.939 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=92.03700000000003 miliseconds
+
+ ======= Run 29: =========
+Woman 1000
+Man 1000
+Init time=122.823 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=138.82500000000005 miliseconds
+
+ ======= Run 28: =========
+Woman 1000
+Man 1000
+Init time=91.835 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=135.0719999999999 miliseconds
+
+ ======= Run 27: =========
+Woman 1000
+Man 1000
+Init time=108.804 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=141.04700000000003 miliseconds
+
+ ======= Run 26: =========
+Woman 1000
+Man 1000
+Init time=101.361 miliseconds
+Matching 
+. Size 999
+Stable true 
+Computation time=143.95900000000006 miliseconds
+
+ ======= Run 25: =========
+Woman 1000
+Man 1000
+Init time=100.678 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=112.04199999999992 miliseconds
+
+ ======= Run 24: =========
+Woman 1000
+Man 1000
+Init time=115.296 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=123.75999999999999 miliseconds
+
+ ======= Run 23: =========
+Woman 1000
+Man 1000
+Init time=91.467 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=87.269 miliseconds
+
+ ======= Run 22: =========
+Woman 1000
+Man 1000
+Init time=139.759 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=145.78500000000008 miliseconds
+
+ ======= Run 21: =========
+Woman 1000
+Man 1000
+Init time=112.063 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=160.8320000000001 miliseconds
+
+ ======= Run 20: =========
+Woman 1000
+Man 1000
+Init time=109.778 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=139.89599999999996 miliseconds
+
+ ======= Run 19: =========
+Woman 1000
+Man 1000
+Init time=97.523 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=128.19100000000003 miliseconds
+
+ ======= Run 18: =========
+Woman 1000
+Man 1000
+Init time=109.583 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=101.29099999999994 miliseconds
+
+ ======= Run 17: =========
+Woman 1000
+Man 1000
+Init time=112.333 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=77.97700000000009 miliseconds
+
+ ======= Run 16: =========
+Woman 1000
+Man 1000
+Init time=127.472 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=120.37799999999993 miliseconds
+
+ ======= Run 15: =========
+Woman 1000
+Man 1000
+Init time=102.586 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=104.24800000000005 miliseconds
+
+ ======= Run 14: =========
+Woman 1000
+Man 1000
+Init time=104.973 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=114.11999999999989 miliseconds
+
+ ======= Run 13: =========
+Woman 1000
+Man 1000
+Init time=114.399 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=124.10899999999992 miliseconds
+
+ ======= Run 12: =========
+Woman 1000
+Man 1000
+Init time=116.626 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=134.31099999999992 miliseconds
+
+ ======= Run 11: =========
+Woman 1000
+Man 1000
+Init time=112.465 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=95.29899999999998 miliseconds
+
+ ======= Run 10: =========
+Woman 1000
+Man 1000
+Init time=121.046 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=104.65100000000007 miliseconds
+
+ ======= Run 9: =========
+Woman 1000
+Man 1000
+Init time=124.876 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=124.30500000000006 miliseconds
+
+ ======= Run 8: =========
+Woman 1000
+Man 1000
+Init time=108.631 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=115.85799999999995 miliseconds
+
+ ======= Run 7: =========
+Woman 1000
+Man 1000
+Init time=114.958 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=107.74399999999991 miliseconds
+
+ ======= Run 6: =========
+Woman 1000
+Man 1000
+Init time=118.328 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=113.53800000000001 miliseconds
+
+ ======= Run 5: =========
+Woman 1000
+Man 1000
+Init time=124.739 miliseconds
+Matching 
+. Size 999
+Stable true 
+Computation time=150.08400000000006 miliseconds
+
+ ======= Run 4: =========
+Woman 1000
+Man 1000
+Init time=110.7 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=107.35200000000009 miliseconds
+
+ ======= Run 3: =========
+Woman 1000
+Man 1000
+Init time=101.479 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=133.5519999999999 miliseconds
+
+ ======= Run 2: =========
+Woman 1000
+Man 1000
+Init time=101.264 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=109.0630000000001 miliseconds
+
+ ======= Run 1: =========
+Woman 1000
+Man 1000
+Init time=97.44 miliseconds
+Matching 
+. Size 1000
+Stable true 
+Computation time=125.5909999999999 miliseconds
