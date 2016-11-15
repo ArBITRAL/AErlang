@@ -1,0 +1,9 @@
+{application,asmp,
+             [{description,"SMTI."},
+              {vsn,"0.1"},
+              {modules,[aerl_trans,aman,asmp,asmp_app,awoman,read,stable,
+                        test]},
+              {registered,[asmp_app]},
+              {applications,[kernel,stdlib]},
+              {env,[{type,ties},{size,1000},{run,2}]},
+              {mod,{asmp_app,[]}}]}.
