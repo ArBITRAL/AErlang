@@ -19,12 +19,12 @@
 
 start() ->
     ok = mnesia:start(),
-    ok = wpool:start(),
+    %%ok = wpool:start(),
     ok = application:start(aerl).
 
 stop() ->
     mnesia:stop(),
-    wpool:stop(),
+    %%wpool:stop(),
     application:stop(aerl).
 
 register(Env) ->

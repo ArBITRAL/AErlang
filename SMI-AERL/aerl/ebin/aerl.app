@@ -7,5 +7,5 @@
                         aerl_utils,make_ms_util,ms_util,ms_util2,plists,
                         users]},
               {registered,[aerl_app,aerl_sup,aerl_registry,aerl_broker]},
-              {applications,[kernel,stdlib,mnesia,worker_pool]},
+              {applications,[kernel,stdlib,mnesia]},
               {mod,{aerl_app,[]}}]}.
