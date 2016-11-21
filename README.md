@@ -75,7 +75,7 @@ Note that whenever a attribute-based receive is used, "from" must be followed by
 
 See the example folder for case studies and details on how to use.
 
-### Other features:
+### (Deprecated)
 ####Receiving predicates can be over elements of message itself (similar to selective receive):
     
     Predicate = "$Money > 100 and id = tom",
@@ -84,7 +84,8 @@ See the example folder for case studies and details on how to use.
         {Money,Y} -> do_work
     end.
 
-####Function start/1 can accept two other operation modes instead of broadcast
+### Working mode
+- broadcast: trivial and expensive cost
 - pushing: It keeps tracks of process attribute values whenever processes update their environments. AErlang helps preselecting the interested groups of receivers.
 - pulling: It keeps tracks of receiving predicates whenever processes perform attribute based receive. AErlang helps preselecting the interested groups of senders.
 
