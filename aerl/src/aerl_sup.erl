@@ -1,11 +1,3 @@
-%%%-------------------------------------------------------------------
-%%% @author Tan Duong <dn.nhattan@gmail.com>
-%%% @copyright (C) 2016, Tan Duong
-%%% @doc
-%%%
-%%% @end
-%%% Created :  5 Sep 2016 by Tan Duong <dn.nhattan@gmail.com>
-%%%-------------------------------------------------------------------
 -module(aerl_sup).
 
 -behaviour(supervisor).
