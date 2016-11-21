@@ -1,12 +1,13 @@
 -module(psmp).
 -compile(export_all).
 
-
 run(_,_,[]) -> init:stop();
 run(N,PATH,[H|T]) ->
     Start1 = os:timestamp(),
     Path = PATH++H,
-    io:format("Solving problem in ~p ~n",[Path]),
+    io:format("\n===============================================\n"),
+    io:format("Solving problem in ~p",[Path]),
+    io:format("\n===============================================\n"),
     WomenList = read:wreadlines(Path++"/women.list"),
     MenList = read:mreadlines(Path++"/men.list"),
     io:format("IO time=~p miliseconds~n",[timer:now_diff(os:timestamp(), Start1)/1000]),
@@ -15,15 +16,23 @@ run(N,PATH,[H|T]) ->
 
 execute(0,_,_) -> ok;
 execute(N,WomenList,MenList) ->
-    io:format("~n ======= Run ~p: =========~n",[N]),
+    io:format("~n ---- Run ~p: ----~n",[N]),
+    ets:new(?MODULE,[named_table,public,{write_concurrency,true}, {read_concurrency,false},{keypos,2}]),
     Start2 = os:timestamp(),
     [Wpids,Mpids] = init(WomenList,MenList),
     io:format("Init time=~p miliseconds~n",[timer:now_diff(os:timestamp(), Start2)/1000]),
     Start3 = os:timestamp(),
     ok = start(WomenList,MenList,Wpids,Mpids),
-    io:format("Computation time=~p miliseconds~n",[timer:now_diff(os:timestamp(), Start3)/1000 - 1000]),
+    io:format("Computation time=~p seconds~n",[timer:now_diff(os:timestamp(), Start3)/1000000]),
+    Start4 = os:timestamp(),
+    State = ets:tab2list(?MODULE),
+    io:format("Stable ~p ~n",[stable:check(State,WomenList,MenList)]),
+    io:format("Stable check time=~p seconds~n",[timer:now_diff(os:timestamp(), Start4)/1000000]),
+    %% Clean up
+    [exit(X,kill) || X <- Mpids],
+    [exit(X,kill) || X <- Wpids],
+    true = ets:delete(?MODULE),
     execute(N-1,WomenList,MenList).
-
 
 init(WomenList,MenList) ->
     Wpids = lists:foldr(fun({Id,Prefs},R) ->
@@ -51,25 +60,27 @@ init(WomenList,MenList) ->
     [Wpids,Mpids].
 
 start(WomenList,MenList,Wpids,Mpids) ->
-    lists:foreach(fun(X) -> X ! start end, Wpids),
-    lists:foreach(fun(X) -> X ! start end, Mpids),
-    log(maps:new(),WomenList,MenList,Wpids,Mpids),
+    [X ! start || X <- Wpids],
+    [X ! start || X <- Mpids],
+    log(WomenList,MenList),
     ok.
 
-log(State,WomenList,MenList,Wpids,Mpids) ->
+log(WomenList,MenList) ->
     receive
-	{M,W} ->
-	    log(maps:put(W,{M,W},State),WomenList,MenList,Wpids,Mpids)
+	stop ->
+	    State = ets:tab2list(?MODULE),
+	    output(State,WomenList,MenList)
     after
-	1000 ->
-	    lists:foreach(fun(X) -> exit(X,kill) end, Mpids),
-	    lists:foreach(fun(X) -> exit(X,kill) end, Wpids),
-	    %List = maps:values(State),
-	    io:format("Matching ~n. Size ~p~n",[maps:size(State)]),
-	    io:format("Stable ~p ~n",[stable:check(maps:values(State),WomenList,MenList)])
-	    %% Seq = lists:seq(1,length(WomenList)),
-	    %% Full = lists:map(fun(X) ->
-	    %% 			      list_to_atom("m"++ integer_to_list(X)) end, Seq),
-	    %% Part = lists:foldl(fun({M,_},Sum) -> [M] ++ Sum end, [], List),
-	    %% io:format("Single men ~p ~n", [Full -- Part])
+	20 ->
+	    State = ets:tab2list(?MODULE),
+	    case length(State) == length(WomenList) of %%andalso stable:check(State,WomenList,MenList) == true of
+		true ->
+		    output(State,WomenList,MenList);
+		false ->
+		    log(WomenList,MenList)
+	    end
     end.
+
+output(State,WomenList,MenList) ->
+    io:format("Matching Size ~p~n",[length(State)]).
+    %%io:format("Stable ~p ~n",[stable:check(State,WomenList,MenList)]).

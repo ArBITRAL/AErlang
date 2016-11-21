@@ -1,11 +1,3 @@
-%%%-------------------------------------------------------------------
-%%% @author tan duong <tanduong@localhost>
-%%% @copyright (C) 2016, tan duong
-%%% @doc
-%%%
-%%% @end
-%%% Created :  9 Oct 2016 by tan duong <tanduong@localhost>
-%%%-------------------------------------------------------------------
 -module(psmp_app).
 
 -behaviour(application).
@@ -36,7 +28,8 @@
 start(_StartType, _StartArgs) ->
     Path = code:priv_dir(psmp),
     {ok, Size} = application:get_env(psmp,size),
-    PATH = Path ++ "/size-" ++ integer_to_list(Size) ++ "/",
+    {ok, Type} = application:get_env(psmp,type),
+    PATH = Path ++ "/size-" ++ integer_to_list(Size) ++ "/" ++ atom_to_list(Type) ++ "/",
     {ok, DirList} = file:list_dir(PATH),
     {ok, N} = application:get_env(psmp,run),
     psmp:run(N,PATH,DirList),
