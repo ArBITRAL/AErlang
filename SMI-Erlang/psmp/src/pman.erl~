@@ -1,0 +1,59 @@
+-module(pman).
+-compile(export_all).
+-record(state,{id,partner,sex,prefs}).
+
+init(Id,Prefs) ->
+    spawn(?MODULE,start,[Id,Prefs]).
+start(Id,Prefs) ->
+    State = #state{id = Id, sex = man, partner = none, prefs = Prefs},
+    receive
+	start ->
+	    loop(State,1)
+    end.
+
+loop(#state{prefs=[]},_) ->
+    ok;
+%% propose and wait for response
+loop(State=#state{prefs=[H|T],id=Id, partner = none},MyRank) ->
+    global:whereis_name(H) ! {propose,MyRank,Id},
+    receive
+	{no, H} ->
+	    receive
+		{propose, Rank, _} when Rank == MyRank; Rank == MyRank + 1 ->
+		    happy(Id);
+		_ ->
+		    loop(State=#state{prefs=T,id=Id},MyRank+1)
+	    end
+    end.
+
+%% wait
+%% loop(State=#state{id=Id, partner = Partner},MyRank) ->
+%%     receive
+%% 	{propose, MyRank, Wid} ->
+%% 	    happy(Id); %% quit
+%% 	{propose, TheirRank, Wid} ->
+%% 	    case bof(List,Partner,Wid) of
+%% 		false ->
+%% 		    global:whereis_name(Wid) ! {no,Id};
+%% 		_ ->
+%% 		    loop(State,My),
+%% 	    end;
+%% 	{no, H} ->
+%% 	    loop(State#state{prefs=T,partner=none},MyRank+1)
+%%     end;
+
+happy(Id) ->
+    receive
+	{propose,_,Woman} ->
+	    global:whereis_name(Woman) ! {no,Id},
+	    happy(Id)
+    end.
+
+bof(_, none, _) -> true;
+bof([], _, _) -> false;
+bof([H|T], Partner, Y) ->
+  case H of
+    Y -> true;
+    Partner -> false;
+      _ -> bof(T, Partner, Y)
+  end.

@@ -1,0 +1,8 @@
+{application,psmp,
+             [{description,"SMTI in Pure Erlang."},
+              {vsn,"0.1"},
+              {modules,[psmp_app,psmp,read,stable,pman,pwoman]},
+              {registered,[psmp_app]},
+              {applications,[kernel,stdlib]},
+	      {env, [{size,1000},{run,50}]},
+              {mod,{psmp_app,[]}}]}.
