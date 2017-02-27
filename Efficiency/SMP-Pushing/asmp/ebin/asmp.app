@@ -1,0 +1,10 @@
+{application,asmp,
+             [{description,"SMTI."},
+              {vsn,"0.1"},
+              {modules,[aerl_trans,aerl_trans_push,aman,aman1,asmp,asmp_app,
+                        awoman,awoman1,read,read1,read_att,stable,test,
+                        transinput]},
+              {registered,[asmp_app]},
+              {applications,[kernel,stdlib]},
+              {env,[{type,atts9010},{size,500},{run,10}]},
+              {mod,{asmp_app,[]}}]}.
