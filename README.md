@@ -32,8 +32,8 @@ Processes can handle their attribute environment via setter and getter functions
 
     aerl:setAtt(Name,Value).
     aerl:getAtt(Name).
-    aerl:setAtts(TupleList).
-    aerl:getAtts(NameList).
+    aerl:setAtt(TupleList).
+    aerl:getAtt(NameList).
 
 where TupleList has the similar form to Environment: [{'Attribute1', Value1},....].
 
@@ -72,20 +72,3 @@ You can declare a Predicate before Erlang receive construct. And use it to filte
         ....
     end.
 Note that whenever a attribute-based receive is used, "from" must be followed by a "receive" construct.
-
-See the example folder for case studies and details on how to use.
-
-### (Deprecated)
-####Receiving predicates can be over elements of message itself (similar to selective receive):
-    
-    Predicate = "$Money > 100 and id = tom",
-    from(Predicate),
-    receive
-        {Money,Y} -> do_work
-    end.
-
-### Working mode
-- broadcast: trivial and expensive cost
-- pushing: It keeps tracks of process attribute values whenever processes update their environments. AErlang helps preselecting the interested groups of receivers.
-- pulling: It keeps tracks of receiving predicates whenever processes perform attribute based receive. AErlang helps preselecting the interested groups of senders.
-
