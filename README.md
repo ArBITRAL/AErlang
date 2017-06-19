@@ -7,7 +7,10 @@ AErlang is a middleware and an extension of Erlang concurrent constructs for ena
 * attribute-based send: A send is decorated with a predicate over attributes of partners, which allows dynamic selecting the group of partners at the communication time.
 * attribute-based receive: Similarly, a predicate at receiver side can be used to filter out uninteresting senders.
 
-## How to use
+## Compilation
+Install rebar compilation tool
+https://github.com/rebar/rebar
+
 
 ### Registering process's attribute environment
 Start AErlang in your application by calling function start/0 from aerlang module:
