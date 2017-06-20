@@ -90,3 +90,8 @@ Note that whenever a attribute-based receive is used, "from" must be followed by
 In this repo, there are aerl programs for stable matching problems.
 Please visit their folder to see how to run them
 
+## Bugs
+aerlang is a prototype, built as a proof-of-concept, for experimenting with ideas of predicate-based message passing.
+
+If you try aerlang and find any problems, please create issues (https://help.github.com/articles/creating-an-issue/)
+so as they could be addressed
