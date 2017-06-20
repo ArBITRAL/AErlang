@@ -8,8 +8,12 @@ AErlang is a middleware and an extension of Erlang concurrent constructs for ena
 * attribute-based receive: Similarly, a predicate at receiver side can be used to filter out uninteresting senders.
 
 ## Compilation
-Install rebar compilation tool
-https://github.com/rebar/rebar
+### Prerequisites
+
+rebar tool https://github.com/rebar/rebar
+
+Erlang OTP >= 18
+
 
 
 ### Registering process's attribute environment
