@@ -19,7 +19,7 @@ rebar compile
 
 Start erl passing the path to ebin/ directory of aerl:
 
-erl -pa aerl/ebin
+    erl -pa aerl/ebin
 
 Start aerl:
 
