@@ -7,8 +7,7 @@ AErlang is a middleware and an extension of Erlang concurrent constructs for ena
 * attribute-based send: A send is decorated with a predicate over attributes of partners, which allows dynamic selecting the group of partners at the communication time.
 * attribute-based receive: Similarly, a predicate at receiver side can be used to filter out uninteresting senders.
 
-## Compilation
-### Prerequisites
+### Compilation Prerequisites
 
 - rebar tool https://github.com/rebar/rebar
 - Erlang OTP >= 18
@@ -16,12 +15,19 @@ AErlang is a middleware and an extension of Erlang concurrent constructs for ena
 At the top-level directory:
 rebar compile
 
-### Registering process's attribute environment
-Start AErlang in your application by calling function start/0 from aerlang module:
+### startup
+
+Start erl passing the path to ebin/ directory of aerl:
+
+erl -pa aerl/ebin
+
+Start aerl:
 
     aerl:start().
 
-This will start mnesia first and then aerlang
+This will start mnesia first and then components process registry, message broker
+
+### Registering process's attribute environment
 
 AErlang processes are normal Erlang one but they need an attribute environment in the form of either a proper list or a map, for example:
 
