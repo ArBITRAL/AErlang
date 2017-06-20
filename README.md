@@ -10,6 +10,7 @@ AErlang is a middleware and an extension of Erlang concurrent constructs for ena
 ### Compilation Prerequisites
 
 - rebar tool https://github.com/rebar/rebar
+(if you are using Mac OSx: https://gist.github.com/recr0ns/ba1d0f1dc859c9789a23)
 - Erlang OTP >= 18
 
 At the top-level directory:
