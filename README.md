@@ -85,3 +85,8 @@ You can declare a Predicate before Erlang receive construct. And use it to filte
         ....
     end.
 Note that whenever a attribute-based receive is used, "from" must be followed by a "receive" construct.
+
+## Running Examples
+In this repo, there are aerl programs for stable matching problems.
+Please visit their folder to see how to run them
+
