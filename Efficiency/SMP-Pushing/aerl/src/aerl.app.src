@@ -1,0 +1,8 @@
+{application, aerl,
+ [{description, "An implementation of the AbC process calculus."},
+  {vsn, "0.1.0"},
+  {modules, [aerl_app, aerl_sup, aerl_registry, aerl_broker]},
+  {registered, [aerl_app, aerl_sup, aerl_registry, aerl_broker]},
+  {applications, [kernel,stdlib,mnesia]},
+  {mod, {aerl_app, []}}
+]}.

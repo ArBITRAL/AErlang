@@ -1,0 +1,1 @@
+-record(aerl_record,{pid,ref,pred}).

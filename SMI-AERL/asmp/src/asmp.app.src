@@ -1,0 +1,7 @@
+{application,asmp,
+             [{description,"SMTI."},
+              {vsn,"0.1"},
+              {modules,[asmp_app,asmp,aerl_trans,read,stable,aman,awoman]},
+              {registered,[asmp_app]},
+              {applications,[kernel,stdlib]},
+              {mod,{asmp_app,[]}}]}.

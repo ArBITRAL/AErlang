@@ -1,0 +1,239 @@
+// people's characteristics
+blue, green, dark, red, rich, poor, strong, weak: Token;
+
+-- message tags
+propose, yes, no : Token;
+
+-- attribute names
+_id, _eyes, _hair, _body, _wealth: Token;
+
+// Class definition
+Class Woman is
+Signals
+   receive(msg);
+Vars
+   id:int,
+   eyes,hair,
+   mb:MessageBroker,
+   fwealth,fbody,
+   partner:int := null,
+   current:int := -1
+
+Transitions
+ s1 -> s1
+ { receive(msg)[msg[0]=propose]/
+        new:int;
+       --- COMPARISION
+       if (fwealth /= msg[3] and fbody /= msg[4]) then {
+            new = 0;
+       };
+       if fwealth = msg[3] then {
+            new = 2;
+       };
+       if fbody = msg[4] then {
+            new = 1;
+       };
+       if (fwealth = msg[3] and fbody = msg[4]) then {
+            new = 3;
+       };
+       if new > current then {
+            mb.send([[_id,partner]],[no,id]);
+	    mb.send([[_id,msg[1]]],[yes,id]);
+            partner:=msg[1];
+            current:=new;
+            mb.set_partner(id,partner,current,msg[2])
+       }
+       else
+       {
+	    mb.send([[_id,msg[1]]],[no,id])
+       }
+ }
+end Woman;
+
+
+// class definition
+Class Man is
+Signals
+   receive(msg);
+Vars:
+   id:int,
+   wealth,body,
+   feyes,fhair;
+   partner:int:=null;
+   mb:MessageBroker,
+   plist:obj[[[]]];
+   pred:obj[[]];
+   refusal:int[];
+   prior:int;
+Transitions
+ s1 -> s2
+   { -[plist.length > 0]/
+    pred:=[refusal]+plist.head;
+    plist:=plist.tail;
+    mb.send1(pred,[propose,id,prior,wealth,body]);
+    prior:=prior+1;
+  }
+ s2 -> s1
+   { receive(msg)[msg[0]=no]/refusal[msg[1]-1]:=msg[1];partner:=null}
+ s2 -> s2
+   { receive(msg)[msg[0]=yes]/partner:=msg[1]}
+end Man;
+
+Class MessageBroker is
+Signals
+    send(pred,msg);
+    send1(pred,msg);
+    set_partner(caller,man,prior,rankofman);
+Operations
+Vars
+    components:obj[];
+    attributes:obj;
+    -- FOR STABLE CHECKING
+    componentsid:int[];
+    wids:int[];
+    mids:int[];
+    size:int;
+    currentw;
+    wpriority;
+    stable:bool;
+Transitions
+    s1 -> s1 {
+        send(pred,msg)/
+        for i in 0..components.length-1 {
+            tmp:int := 0;
+            for j in 0..pred.length-1 {
+                for k in 0..attributes[i].length-1 {
+                    if attributes[i][k] = pred[j] then {tmp:=tmp+1;}
+                }
+            };
+            if tmp = pred.length then {
+                components[i].receive(msg)
+            }
+        }
+    }
+    -- FOR MEN with refusal list
+    s1 -> s1 {
+        send1(pred,msg)/
+        for i in 0..components.length-1 {
+            if componentsid[i] /= pred[0][i] then {
+                tmp:int := 0;
+                for j in 1..pred.length-1 {
+                    for k in 0..attributes[i].length-1 {
+                        if attributes[i][k] = pred[j] then {tmp:=tmp+1;}
+                    }
+                };
+                if tmp = pred.length-1 then {
+                    components[i].receive(msg)
+                }
+            }
+        }
+    }
+    s1 -> s1 {
+        set_partner(caller,man,prior,rankofman)/
+        wpriority[caller-size-1]:=prior;
+        currentw[man-1]:=rankofman;
+        flag:bool;
+        flag:=true;
+        stable:=false;
+        for i in 0..wpriority.length-1 {
+            if (wpriority[i] = null) then {flag:=false;}
+        };
+        if flag = true then {
+            stable:=true;
+            for m in 0..size-1 {
+                for w in 0..size-1 {
+                    mid:int:=mids[m];
+                    wid:int:=wids[w];
+
+                    -- calculate ranking of woman w according to the predicate list of man m
+                    rankw:int;
+                    -- extract the predicate list of man m
+                    tmp_list:obj:=attributes[mid][3];
+                    -- check if woman w attributes are in any predicate of man m
+                    for i in 0..tmp_list.length-1 {
+                        counter:int := 0;
+                        pred:obj:=tmp_list[i];
+                        for j in 0..pred.length-1 {
+                            for k in 0..attributes[wid].length-1 {
+                                if attributes[wid][k] = pred[j] then {counter:=counter+1;}
+                            }
+                        };
+                        if counter = pred.length then {
+                            rankw:=i;
+                            if rankw < currentw[mid] then { -- m prefer w to his current partner
+                                -- check if w also prefer m to her current partner
+                                rankm:int;
+                                --- COMPARISION
+                                if (attributes[wid][3][1] /= attributes[mid][1][1] and attributes[wid][4][1] /= attributes[mid][2][1]) then {
+                                    rankm = 0;
+                                };
+                                if attributes[wid][3][1] = attributes[mid][1][1] then {
+                                    rankm = 2;
+                                };
+                                if attributes[wid][4][1] = attributes[mid][2][1] then {
+                                    rankm = 1;
+                                };
+                                if (attributes[wid][3][1] = attributes[mid][1][1] and attributes[wid][4][1] = attributes[mid][2][1]) then {
+                                    rankm = 3;
+                                };
+                                if (rankm > wpriority[wid]) then {stable:=false;}
+                            }
+                        }
+                    };
+               }
+            }
+        }
+    }
+end MessageBroker;
+
+
+m1: Man (id -> 1, wealth -> rich, body -> strong, feyes -> blue, fhair -> red, mb -> MB,
+plist -> [ [[_eyes,blue],[_hair,red]], [[_eyes,blue]], [[_hair,red]] ]
+)
+m2: Man (id -> 2, wealth -> poor, body -> weak, feyes -> blue, fhair -> red, mb -> MB,
+plist -> [ [[_eyes,green],[_hair,dark]], [[_eyes,green]],[[_hair,dark]]]
+)
+m3: Man (id -> 3, wealth -> poor, body -> strong, feyes -> green, fhair -> red, mb -> MB,
+plist -> [ [[_eyes,green],[_hair,red]], [[_eyes,green]], [[_hair,red]] ]
+)
+
+m4: Man (id -> 4, wealth -> poor, body -> weak, feyes -> blue, fhair -> red, mb -> MB,
+plist -> [ [[_eyes,blue],[_hair,red]], [[_eyes,blue]],[[_hair,red]]]
+)
+
+w1: Woman (id -> 5, eyes -> blue, hair -> red, fwealth -> poor, fbody -> weak, mb -> MB)
+w2: Woman (id -> 6, eyes -> blue, hair -> dark, fwealth -> rich, fbody -> strong, mb -> MB)
+w3: Woman (id -> 7, eyes -> green, hair -> red, fwealth -> rich, fbody -> strong, mb -> MB)
+w4: Woman (id -> 8, eyes -> green, hair -> dark, fwealth -> rich, fbody -> weak, mb -> MB)
+
+
+MB: MessageBroker (
+wpriority -> [null,null,null,null],
+size -> 4,
+mids -> [0,1,2,3], //for accessing attributes lists
+wids -> [4,5,6,7],
+components -> [m1,m2,m3,m4,w1,w2,w3,w4],
+componentsid -> [1,2,3,4,5,6,7,8],
+attributes -> [
+    [[_id,1],[_wealth,rich],[_body,strong],[[[_eyes,blue],[_hair,red]], [[_eyes,blue]], [[_hair,red]] ]],
+    [[_id,2],[_wealth,rich],[_body,weak],[[[_eyes,green],[_hair,dark]], [[_eyes,green]],[[_hair,dark]]]],
+    [[_id,3],[_wealth,poor],[_body,strong],[ [[_eyes,green],[_hair,red]], [[_eyes,green]], [[_hair,red]] ]],
+    [[_id,4],[_wealth,poor],[_body,weak],[[[_eyes,blue],[_hair,red]], [[_eyes,blue]],[[_hair,red]]]],
+    [[_id,5],[_eyes,blue],[_hair,red]],
+    [[_id,6],[_eyes,blue],[_hair,dark]],
+    [[_id,7],[_eyes,green],[_hair,red]],
+    [[_id,8],[_eyes,green],[_hair,dark]]
+    ]
+)
+
+Abstractions {
+   State w1.partner=$1 -> w1($1)
+   State w2.partner=$1 -> w2($1)
+   State w3.partner=$1 -> w3($1)
+   State w4.partner=$1 -> w4($1)
+   State m1.partner=$1 -> m1($1)
+   State m2.partner=$1 -> m2($1)
+   State m3.partner=$1 -> m3($1)
+   State m4.partner=$1 -> m4($1)
+   State MB.stable=$1 -> stable($1)
+}

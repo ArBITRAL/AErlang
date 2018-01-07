@@ -1,0 +1,21 @@
+Exec: /Users/tanduong/ErlangCode/aerl_release/rel/asmp/erts-7.0/bin/erlexec  -boot /Users/tanduong/ErlangCode/aerl_release/rel/asmp/releases/1/asmp -mode embedded -config /Users/tanduong/ErlangCode/aerl_release/rel/asmp/releases/1/sys.config -args_file /Users/tanduong/ErlangCode/aerl_release/rel/asmp/releases/1/vm.args -- console
+Root: /Users/tanduong/ErlangCode/aerl_release/rel/asmp
+
+=INFO REPORT==== 19-Oct-2016::14:27:48 ===
+Creating wpool ETS table
+=INFO REPORT==== 19-Oct-2016::14:27:48 ===
+    application: mnesia
+    exited: stopped
+    type: permanent
+Solving problem in "/Users/tanduong/ErlangCode/aerl_release/rel/asmp/lib/asmp-0.1/priv/size-1000/hard1" 
+IO time=147.158 miliseconds
+
+ ======= Run 50: =========
+Woman 1000
+Man 1000
+Init time=42.558 miliseconds
+Man m920 become bachelor and try again 
+Man m212 become bachelor and try again 
+Man m670 become bachelor and try again 
+Man m619 become bachelor and try again 
+Man m361 become bachelor and try again 

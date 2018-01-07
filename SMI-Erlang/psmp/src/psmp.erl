@@ -1,0 +1,86 @@
+-module(psmp).
+-compile(export_all).
+
+run(_,_,[]) -> init:stop();
+run(N,PATH,[H|T]) ->
+    Start1 = os:timestamp(),
+    Path = PATH++H,
+    io:format("\n===============================================\n"),
+    io:format("Solving problem in ~p",[Path]),
+    io:format("\n===============================================\n"),
+    WomenList = read:wreadlines(Path++"/women.list"),
+    MenList = read:mreadlines(Path++"/men.list"),
+    io:format("IO time=~p miliseconds~n",[timer:now_diff(os:timestamp(), Start1)/1000]),
+    ok = execute(N,WomenList,MenList),
+    run(N,PATH,T).
+
+execute(0,_,_) -> ok;
+execute(N,WomenList,MenList) ->
+    io:format("~n ---- Run ~p: ----~n",[N]),
+    ets:new(?MODULE,[named_table,public,{write_concurrency,true}, {read_concurrency,false},{keypos,2}]),
+    Start2 = os:timestamp(),
+    [Wpids,Mpids] = init(WomenList,MenList),
+    io:format("Init time=~p miliseconds~n",[timer:now_diff(os:timestamp(), Start2)/1000]),
+    Start3 = os:timestamp(),
+    ok = start(WomenList,MenList,Wpids,Mpids),
+    io:format("Computation time=~p seconds~n",[timer:now_diff(os:timestamp(), Start3)/1000000]),
+    Start4 = os:timestamp(),
+    State = ets:tab2list(?MODULE),
+    io:format("Stable ~p ~n",[stable:check(State,WomenList,MenList)]),
+    io:format("Stable check time=~p seconds~n",[timer:now_diff(os:timestamp(), Start4)/1000000]),
+    %% Clean up
+    [exit(X,kill) || X <- Mpids],
+    [exit(X,kill) || X <- Wpids],
+    true = ets:delete(?MODULE),
+    execute(N-1,WomenList,MenList).
+
+init(WomenList,MenList) ->
+    Wpids = lists:foldr(fun({Id,Prefs},R) ->
+    			  [pwoman:init(Id, Prefs) | R] end, [],
+    			  WomenList),
+    io:format("Woman ~p~n",[length(Wpids)]),
+    Mpids = lists:foldr(fun({Id,Prefs},R) ->
+				[pman:init(Id,Prefs) | R] end, [],
+			MenList),
+    io:format("Man ~p~n",[length(Mpids)]),
+    Wid = [Id || {Id,_} <- WomenList],
+    %io:format("Wid ~p~n",[Wid]),
+    L1 = lists:zip(Wid,Wpids),
+    %io:format("L1 ~p~n",[L1]),
+    lists:foreach(fun({Id,P}) ->
+    			  global:register_name(Id,P) end, L1),
+    Mid = [Id || {Id,_} <- MenList],
+    %io:format("Mid ~p~n",[Mid]),
+    L2 = lists:zip(Mid,Mpids),
+    %io:format("L2 ~p~n",[L2]),
+    lists:foreach(fun({Id,P}) ->
+    			  global:register_name(Id,P) end, L2),
+
+    global:register_name(log,self()),
+    [Wpids,Mpids].
+
+start(WomenList,MenList,Wpids,Mpids) ->
+    [X ! start || X <- Wpids],
+    [X ! start || X <- Mpids],
+    log(WomenList,MenList),
+    ok.
+
+log(WomenList,MenList) ->
+    receive
+	stop ->
+	    State = ets:tab2list(?MODULE),
+	    output(State,WomenList,MenList)
+    after
+	20 ->
+	    State = ets:tab2list(?MODULE),
+	    case length(State) == length(WomenList) of %%andalso stable:check(State,WomenList,MenList) == true of
+		true ->
+		    output(State,WomenList,MenList);
+		false ->
+		    log(WomenList,MenList)
+	    end
+    end.
+
+output(State,WomenList,MenList) ->
+    io:format("Matching Size ~p~n",[length(State)]).
+    %%io:format("Stable ~p ~n",[stable:check(State,WomenList,MenList)]).

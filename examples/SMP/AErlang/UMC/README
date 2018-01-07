@@ -1,0 +1,14 @@
+
+1) Please visit the UMC webpage
+http://fmt.isti.cnr.it/umc/V4.2/umc.html
+
+2) Load models
+Model Definition -> New Model -> "Load one model in Models folder
+by copy and paste its content to the web interface" -> Load Current Model
+
+3) Property checking
+
+After loading, check properties by click to ModelCheck L2TS
+-> "Load one property in the Properties folder
+by copy and paste its content to the web form"
+-> Check the Formula

@@ -1,0 +1,12 @@
+{application, aerlang,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { aerlang_app, []}},
+  {env, []}
+ ]}.

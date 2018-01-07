@@ -1,0 +1,12 @@
+{application,aerl,
+             [{description,"An implementation of the AbC process calculus."},
+              {vsn,"0.1.0"},
+              {modules,[aerl,aerl_app,aerl_broker,aerl_check,aerl_code,
+                        aerl_connect,aerl_decomp,aerl_dnf,aerl_env,aerl_guard,
+                        aerl_guard1,aerl_ms,aerl_parser,aerl_registry,
+                        aerl_scanner,aerl_store,aerl_sup,aerl_trans,
+                        aerl_utils,example,make_ms_util,ms_util,ms_util2,
+                        plists,users]},
+              {registered,[aerl_app,aerl_sup,aerl_registry,aerl_broker]},
+              {applications,[kernel,stdlib,mnesia]},
+              {mod,{aerl_app,[]}}]}.

@@ -1,0 +1,164 @@
+// constant literals
+blue, green, dark, red, rich, poor, strong, weak: Token;
+propose, yes, no : Token;
+-- attributes
+id, eyes, hair, body, wealth: Token;
+
+--- W ::= ((x=propose)(x,y).
+---
+---    <BOF(this.partner,y)>
+---       [this.exPartner:=this.partner,this.partner:=y](invalid)@(mid=this.exPartner).0
+---    +
+---    <not BOF(this.partner,y)>
+---       (invalid)@(mid=y).0
+--- ).W
+
+// class definition
+Class Woman is
+Signals
+   receive(msg);
+Vars
+   tid:int,
+   coord,
+   fwealth,fbody,teyes,thair,
+   partner:int := null,
+   weight:int[],
+   wcurrent:int := -1
+
+Transitions
+ s1 -> s1
+ { receive(msg)[msg[0]=propose]/
+        new:int;
+       --- COMPARISION
+       if (fwealth /= msg[2] and fbody /= msg[3]) then {
+            new = 0;
+       };
+       if fwealth = msg[2] then {
+            new = 2;
+       };
+       if fbody = msg[3] then {
+            new = 1;
+       };
+       if (fwealth = msg[2] and fbody = msg[3]) then {
+            new = 3;
+       };
+       if new > wcurrent then {
+            if partner /= null then {
+                coord.send([[id,partner]],[no,tid])
+            };
+
+            coord.send([[id,msg[1]]],[yes,tid]);
+            partner:=msg[1];
+            wcurrent:=new;
+            OUT.increase
+       }
+       else
+       {
+            coord.send([[id,msg[1]]],[no,tid])
+
+       }
+ }
+end Woman;
+
+
+--- M ::= [this.partner:=prefs.head,prefs:=prefs.tail](propose,this.id)@(id=this.partner).(x=invalid)(x).M
+// class definition
+
+Class Man is
+Signals
+   receive(msg);
+Vars:
+   tid:int,
+   coord:Coord,
+   pred_list:obj[[[]]];
+   pred:obj[[]];
+   refusal:int[];
+   twealth,tbody,feyes,fhair;
+   engaged:bool;
+Transitions
+ s1 -> s2
+   { -[pred_list.length > 0]/
+    pred:=[refusal]+pred_list.head;
+    pred_list:=pred_list.tail;
+    coord.send1(pred,[propose,tid,twealth,tbody]);
+    engaged:=true;
+  }
+ s2 -> s1
+   { receive(msg)[msg[0]=no]/refusal[msg[1]-1]:=msg[1];engaged:=false;}
+ s2 -> s2
+   { receive(msg)[msg[1]=yes]/engaged:=true;}
+end Man;
+
+Class Coord is
+Signals
+    send(pred,msg);
+    send1(pred,msg);
+Vars
+    components:obj[];
+    componentsid:int[];
+    attributes:obj;
+Transitions
+    s1 -> s1 {
+        send(pred,msg)/
+        for i in 0..components.length-1 {
+            tmp:int := 0;
+            for j in 0..pred.length-1 {
+                for k in 0..attributes[i].length-1 {
+                    if attributes[i][k] = pred[j] then {tmp:=tmp+1;}
+                }
+            };
+            if tmp = pred.length then {
+                components[i].receive(msg)
+            }
+        }
+    }
+    s1 -> s1 {
+        send1(pred,msg)/
+        for i in 0..components.length-1 {
+            if componentsid[i] /= pred[0][i] then {
+                tmp:int := 0;
+                for j in 1..pred.length-1 {
+                    for k in 0..attributes[i].length-1 {
+                        if attributes[i][k] = pred[j] then {tmp:=tmp+1;}
+                    }
+                };
+                if tmp = pred.length-1 then {
+                    components[i].receive(msg)
+                }
+            }
+        }
+    }
+end Coord;
+
+
+m1: Man (tid -> 1, twealth -> rich, tbody -> strong, feyes -> blue, fhair -> red, coord -> MB,
+pred_list -> [ [[eyes,blue],[hair,red]], [[eyes,blue]], [[hair,red]] ]
+--pred_list -> [ [[eyes,blue],[hair,red]] ]
+)
+m2: Man (tid -> 2, twealth -> poor, tbody -> weak, feyes -> blue, fhair -> red, coord -> MB,
+pred_list -> [ [[eyes,blue],[hair,red]], [[eyes,blue]],[[hair,red]]]
+--pred_list -> [ [[eyes,blue],[hair,red]] ]
+)
+
+
+w1: Woman (tid -> 3, teyes -> blue, thair -> red, fwealth -> poor, fbody -> weak, coord -> MB)
+w2: Woman (tid -> 4, teyes -> blue, thair -> dark, fwealth -> rich, fbody -> strong, coord -> MB)
+
+
+MB: Coord (
+components -> [m1,m2,w1,w2],
+componentsid -> [1,2,3,4],
+attributes -> [
+    [[id,1],[wealth,rich],[body,strong]],
+    [[id,2],[wealth,poor],[body,weak]],
+    [[id,3],[eyes,blue],[hair,red]],
+    [[id,4],[eyes,blue],[hair,dark]]
+    ]
+)
+
+Abstractions {
+   State w1.partner=$1 -> w1($1)
+   State w2.partner=$1 -> w2($1)
+   State m1.engaged=$1 -> m1($1)
+   State m2.engaged=$1 -> m2($1)
+}
