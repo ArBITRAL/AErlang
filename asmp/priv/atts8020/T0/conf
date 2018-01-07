@@ -1,0 +1,13 @@
+{men,300,
+      [{atts,[wealth,body]},
+       {domain,[[{rich,0.8},{poor,0.2}],[{strong,0.8},{weak,0.2}]]}],
+      [{prefs,[eyes,hair]},
+	{domain,[[{amber,0.8},{green,0.2}],[{red,0.8},{dark,0.2}]]}]
+}.
+
+{women,300,
+      [{atts,[eyes,hair]},
+       {domain,[[{amber,0.8},{green,0.2}],[{red,0.8},{dark,0.2}]]}],
+       [{prefs,[wealth,body]},
+	{domain,[[{rich,0.8},{poor,0.2}],[{strong,0.8},{weak,0.2}]]}]
+}.
