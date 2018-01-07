@@ -53,9 +53,6 @@ Erlang code.
 
 v({_, _, Value}) -> Value.
 
-v1({_,_,Name}) ->
-    ms_util2:get_variable(aerl_store, Name).
-
 make(Tokens) ->
     {ok, Parsed} = aerl_decomp:parse(Tokens),
     Guards = eval(Parsed),

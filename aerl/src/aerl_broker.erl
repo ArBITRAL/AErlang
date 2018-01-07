@@ -103,6 +103,9 @@ handle_call({Pred,Msg,Env}, From, State) ->
 	    pull(Pred,Msg,Env,From)
     end,
     {noreply, State}.
+
+
+
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
@@ -113,6 +116,7 @@ handle_call({Pred,Msg,Env}, From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+
 handle_cast({Pred,Msg,Env,Pid}, State) ->
     case State#state.mode of
 	pushpull ->
@@ -141,6 +145,7 @@ handle_cast({normal,Pred,Msg,Env,Pid}, State) ->
 handle_cast({Pred,Pid}, State) ->
     spawn(fun() -> handle_receive(Pred,Pid) end),
     {noreply, State}.
+
 
 %%--------------------------------------------------------------------
 %% @private
@@ -237,6 +242,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%     gen_server:reply(From,lists:sum(Recv)).
 
 bcast(Pred,Msg,Senv,Pid) when is_pid(Pid) ->
+   % Start = os:timestamp(),
     [Att,Guard] = aerl_guard:bguard(Pred,Pid),
     RInfo = [pid],
     Head = ms_util:make_ms(aerl_store,RInfo ++ Att),
@@ -244,6 +250,8 @@ bcast(Pred,Msg,Senv,Pid) when is_pid(Pid) ->
     %L = mnesia:dirty_select(aerl_store,[{#aerl_store{pid = '$1', _ = '_'},[{'=/=','$1',Pid}],['$1']}]),
     Fun = aerl_check:make_fun(Pred),
     Recv = [P ! {Msg, {ok,Fun,Senv}} || P <- L],
+%    Now = timer:now_diff(os:timestamp(), Start)/1000,
+    %% ets:insert(broker,{Pid,Now}),
     %Size = length(Recv)*erlang_term:byte_size({Msg,{Pid,Fun,Senv}}),
     %count_req(Size),
     count_msg(length(Recv)),
@@ -258,6 +266,7 @@ bcast(Pred,Msg,Senv,{Pid,_}=From) ->
     %% Return = mnesia:dirty_select(aerl_store,[{Head,[Guard],Result}]),
     %L = mnesia:dirty_select(aerl_store,[{#aerl_store{pid = '$1', _ = '_'},[{'=/=','$1',Pid}],['$1']}]),
     L = mnesia:dirty_select(aerl_store, [{Head, [Guard], Result}]),
+    %%io:format("BCAST SELECTION ~p ~n",[length(L)]),
     Fun = aerl_check:make_fun(Pred),
     Recv = [P ! {Msg, {Pid, Fun, Senv}} || P <- L],
     gen_server:reply(From,length(Recv)),
@@ -268,11 +277,14 @@ bcast(Pred,Msg,Senv,{Pid,_}=From) ->
 
 
 push(Pred,Msg,Senv,Pid) when is_pid(Pid) ->
+   % Start = os:timestamp(),
     [Att,Guard] = aerl_guard:make(Pred),
     RInfo = [pid],
     Head = ms_util:make_ms(aerl_store,RInfo ++ Att),
     Result = ['$1'],
     Recv = mnesia:dirty_select(aerl_store,[{Head,[Guard],Result}]),
+    %Fun = fun([P]) -> P ! {Msg, {ok, Senv}} end,
+    %L2 = pmap(Fun, Recv -- [[Pid]]),
     L2 = [P ! {Msg, {ok, Senv}} || P <- Recv, Pid =/= P],
     count_msg(length(L2)),
     %Size = length(L2)*erlang_term:byte_size({Msg,{ok,Senv}}),
@@ -288,8 +300,12 @@ push(Pred, Msg, Senv, {Pid, _} = From) ->
     Head = ms_util:make_ms(aerl_store, RInfo ++ Att),
     Result = ['$1'],
     Recv = mnesia:dirty_select(aerl_store, [{Head, [Guard], Result}]),
+%    Fun = fun([P],Recept) -> P ! {Msg, {Recept, Senv}} end,
+ %   L2 = pmap(Fun, Recv -- [[Pid]]),
     L2 = [P ! {Msg, {Pid, Senv}} || P <- Recv, Pid =/= P],
     gen_server:reply(From, length(L2)),
+    %[Pid ! M1 || M1 <- L2],
+    %%gen_server:reply(From, L2),
     count_msg(length(L2)),
     %Size = length(L2)*erlang_term:byte_size({Msg,{Pid,Senv}}),
     %count_req(Size),
@@ -301,6 +317,18 @@ pull(Pred, Msg, Env, Pid) when is_pid(Pid) ->
     Fun = aerl_check:make_fun(Pred),
     L = mnesia:dirty_select(aerl_sub, [{#aerl_sub{pid = '$1', pred = '$2', _ = '_'}, [{'=/=', '$1', Pid}], ['$$']}]),
     L2 = [P ! {Msg, {Fun, ok}} || [P, RPred] <- L, RPred =/= undefined andalso RPred(Env) == true],
+    %Now = timer:now_diff(os:timestamp(), Start)/1000,
+    %% ets:insert(broker,{Pid,Now}),
+    %% count_req(1),
+    %% count_service(length(L2)),
+    %% case Recv of
+    %% 	[] ->
+	    %% Now = now_to_micro_seconds(os:timestamp()),
+	    %% NewEnv = Env ++ [{pid,Pid},{env,Env},{pred,Fun},{msg,Msg},{time,Now}],
+	    %% Rec1 = ms_util:make_rec(aerl_pub,NewEnv),
+	    %% mnesia:dirty_write(Rec1),
+    %% 	_ -> ok
+    %% end,
     ok;
 pull(Pred, Msg, Env, {Pid, _} = From) ->
     gen_server:reply(From, ok),
@@ -413,43 +441,43 @@ count_service(0) -> ok;
 count_service(X) when X > 0 ->
     ets:update_counter(service,num,X);
 count_service(X) ->
-    io:format("~p ~n",[X]).
+    io:format("What is this ~p ~n",[X]).
 
 
 count_req(0) -> ok;
 count_req(X) when X > 0 ->
     ets:update_counter(request,num,X);
 count_req(X) ->
-    io:format("~p ~n",[X]).
+    io:format("What is this ~p ~n",[X]).
 
 count_msg(0) -> ok;
 count_msg(X) when X > 0 ->
     ets:update_counter(message,num,X);
 count_msg(X) ->
-    io:format("~p ~n",[X]).
+    io:format("What is this ~p ~n",[X]).
 
-%% pmap(F, L) ->
-%%     S = self(),
-%%     Ref = make_ref(),
-%%     lists:foreach(fun(I) ->
-%% 		    spawn(fun() -> do_f1(S, Ref, F, I) end)
-%% 	    end, L),
-%%     %% gather the results
-%%     gather1(length(L), Ref, []).
+pmap(F, L) ->
+    S = self(),
+    Ref = make_ref(),
+    lists:foreach(fun(I) ->
+		    spawn(fun() -> do_f1(S, Ref, F, I) end)
+	    end, L),
+    %% gather the results
+    gather1(length(L), Ref, []).
 
-%% do_f1(Parent, Ref, F, I) ->
-%%     C = self(),
-%%     io:format("Send ~p to ~p ~n",[C,I]),
-%%     catch F(I,C),
-%%     Ret =
-%% 	receive
-%% 	    Msg ->
-%% 		Msg
-%% 	end,
-%%     Parent ! {Ref, Ret}.
+do_f1(Parent, Ref, F, I) ->
+    C = self(),
+    io:format("Send ~p to ~p ~n",[C,I]),
+    catch F(I,C),
+    Ret =
+	receive
+	    Msg ->
+		Msg
+	end,
+    Parent ! {Ref, Ret}.
 
-%% gather1(0, _, L) -> L;
-%% gather1(N, Ref, L) ->
-%%     receive
-%% 	{Ref, Ret} -> gather1(N-1, Ref, [Ret|L])
-%%     end.
+gather1(0, _, L) -> L;
+gather1(N, Ref, L) ->
+    receive
+	{Ref, Ret} -> gather1(N-1, Ref, [Ret|L])
+    end.
