@@ -7,13 +7,13 @@
 %%%-------------------------------------------------------------------
 -module(make_ms_util).
 
--include("aerl.hrl").
+-include("../include/aerl.hrl").
 
--export([make/0]).
+-export([main/1]).
 
 -define(MODULENAME,"ms_util2").
 
-make() ->
+main(["build"]) ->
     {ok,Tree}=epp:parse_file("../include/aerl.hrl",["./"]),
     Src=make_src(Tree),
     ok=file:write_file(?MODULENAME++".erl",list_to_binary(Src)).
@@ -35,7 +35,7 @@ expand_fields(Name,[{record_field,_,{atom,_,F},_}|T],N,Acc) ->
     expand_fields(Name,T,N+1,[mk(Name,F,N)|Acc]);
 expand_fields(Name,[{record_field,_,{atom,_,F}}|T],N,Acc) ->
     expand_fields(Name,T,N+1,[mk(Name,F,N)|Acc]);
-expand_fields(Name,[H|T],N,Acc) -> expand_fields(Name,T,N+1,Acc).
+expand_fields(Name,[_H|T],N,Acc) -> expand_fields(Name,T,N+1,Acc).
 
 %% mk2/1 builds the no of fields fns
 mk2(Name,N) -> "no_of_fields("++atom_to_list(Name)++") -> "++

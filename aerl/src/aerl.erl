@@ -11,21 +11,29 @@
 	 a_receive/1]).
 
 -export([getEnv/0,
+	 getEnv/1,
+	 newAtt/2,
+	 setAtt/1,
 	 setAtt/2,
 	 getAtt/1,
-	 setAtts/1,
-	 getAtts/1
+	 initEnv/1,
+	 restrict/1,
+	 visible/1,
+	 visible/2
 	]).
--export([last_act/0]).
+
 
 start() ->
+    %ok = application:start(sasl),
     ok = mnesia:start(),
-    %%ok = wpool:start(),
+    %%ok = application:start(tinymq),
     ok = application:start(aerl).
 
 stop() ->
     mnesia:stop(),
+    %%application:stop(tinymq),
     %%wpool:stop(),
+    %application:stop(sasl),
     application:stop(aerl).
 
 register(Env) ->
@@ -46,20 +54,53 @@ a_send(Pred,Msg) ->
 a_receive(Pred) ->
     aerl_broker:a_receive(Pred).
 
+
+initEnv(Env) ->
+    aerl_env:initEnv(Env).
+
+visible(Att) ->
+    aerl_env:visible(Att,static).
+
+visible(Att,How) ->
+    aerl_env:visible(Att,How).
+
+restrict(Att) ->
+    aerl_env:restrict(Att).
+
 getEnv() ->
     aerl_env:getEnv().
 
-getAtt(Name) ->
-    aerl_env:getAtt(Name).
+getEnv(Visibility) ->
+    aerl_env:getEnv(Visibility).
 
-getAtts(List) ->
-    aerl_env:getAtts(List).
+newAtt(Name, Value) ->
+    aerl_env:newA(Name, Value).
 
 setAtt(Name, Value) ->
-    aerl_env:setAtt(Name, Value).
+    aerl_env:setA(Name, Value).
 
-setAtts(TupleList) ->
-    aerl_env:setAtts(TupleList).
+setAtt(List) ->
+    aerl_env:setA(List).
 
-last_act() ->
-    aerl_broker:last_act().
+getAtt(Name) ->
+    aerl_env:getA(Name).
+
+
+
+%% getEnv() ->
+%%     aerl_env:getEnv().
+
+%% getAtt(Name) ->
+%%     aerl_env:getAtt(Name).
+
+%% getAtts(List) ->
+%%     aerl_env:getAtts(List).
+
+%% setAtt(Name, Value) ->
+%%     aerl_env:setAtt(Name, Value).
+
+%% setAtts(TupleList) ->
+%%     aerl_env:setAtts(TupleList).
+
+%% last_act() ->
+%%     aerl_broker:last_act().

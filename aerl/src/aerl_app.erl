@@ -1,9 +1,17 @@
+%%%-------------------------------------------------------------------
+%%% @author Tan Duong <dn.nhattan@gmail.com>
+%%% @copyright (C) 2016, Tan Duong
+%%% @doc
+%%%
+%%% @end
+%%% Created :  5 Sep 2016 by Tan Duong <dn.nhattan@gmail.com>
+%%%-------------------------------------------------------------------
 -module(aerl_app).
 
 -behaviour(application).
 
 %% Application callbacks
--export([start/2, stop/1]).
+-export([start/2, stop/1,get_env/3]).
 
 %%%===================================================================
 %%% Application callbacks

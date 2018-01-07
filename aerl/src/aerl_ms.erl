@@ -1,9 +1,8 @@
 -module(aerl_ms).
 -export([make/1]).
 
-make(Pred) when is_list(Pred) ->
-    {ok, Parsed_Tree} = aerl_guard:parse(Pred),
-    ms(Parsed_Tree).
+make(Parsed) ->
+    ms(Parsed).
 
 %% Arithmic Expressions
 ms({add, Left, Right} = _Exp) -> {'+', ms(Left), ms(Right)};

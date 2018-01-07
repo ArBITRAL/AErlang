@@ -1,17 +1,17 @@
 %%%-------------------------------------------------------------------
-%%% @author Tan Duong <dn.nhattan@gmail.com>
-%%% @copyright (C) 2016, Tan Duong
+%%% @author tan duong <tanduong@localhost>
+%%% @copyright (C) 2017, tan duong
 %%% @doc
 %%%
 %%% @end
-%%% Created :  5 Sep 2016 by Tan Duong <dn.nhattan@gmail.com>
+%%% Created : 16 Aug 2017 by tan duong <tanduong@localhost>
 %%%-------------------------------------------------------------------
--module(aerl_sup).
+-module(aerl_mq_sup).
 
 -behaviour(supervisor).
 
 %% API
--export([start_link/1]).
+-export([start_link/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -29,8 +29,8 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start_link(Mode) ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, [Mode]).
+start_link() ->
+    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
 %%%===================================================================
 %%% Supervisor callbacks
@@ -49,34 +49,20 @@ start_link(Mode) ->
 %%                     {error, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Mode]) ->
-    SupFlags = #{strategy => one_for_one,
-		 intensity => 4,
-		 period => 3600},
+init([]) ->
 
-    RegistryChild = #{id => aerl_registry,
-	       start => {aerl_registry, start_link, [Mode]},
-	       restart => permanent,
+    SupFlags = #{strategy => simple_one_for_one,
+		 intensity => 0,
+		 period => 10},
+
+    AChild = #{id => aerl_handle,
+	       start => {aerl_handle, start_link, []},
+	       restart => temporary,
 	       shutdown => 2000,
 	       type => worker,
-	       modules => [aerl_registry]},
-    BrokerChild = #{id => aerl_broker,
-	       start => {aerl_broker, start_link, [Mode]},
-	       restart => permanent,
-	       shutdown => 2000,
-	       type => worker,
-	       modules => [aerl_broker]},
+	       modules => [aerl_handle]},
 
-    %% MQChild = #{id => aerl_mq_sup,
-    %% 	       start => {aerl_mq_sup, start_link, [Mode]},
-    %% 	       restart => temporary,
-    %% 	       shutdown => 2000,
-    %% 		type => supervisor,
-    %% 		modules => [aerl_mq_sup]},
-
-
-    %% {ok, {SupFlags, [RegistryChild,BrokerChild,MQChild]}}.
-    {ok, {SupFlags, [RegistryChild,BrokerChild]}}.
+    {ok, {SupFlags, [AChild]}}.
 
 %%%===================================================================
 %%% Internal functions

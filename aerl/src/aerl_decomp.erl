@@ -6,9 +6,6 @@
 
 v({_, _, Value}) -> Value.
 
-v1({_,_,Name}) ->
-    ms_util2:get_variable(aerl_store, Name).
-
 make(Tokens) ->
     {ok, Parsed} = aerl_decomp:parse(Tokens),
     Guards = eval(Parsed),
@@ -202,7 +199,7 @@ yecctoken2string(Other) ->
 
 
 
--file("src/aerl_decomp.erl", 205).
+-file("src/aerl_decomp.erl", 202).
 
 -dialyzer({nowarn_function, yeccpars2/7}).
 yeccpars2(0=S, Cat, Ss, Stack, T, Ts, Tzr) ->
@@ -908,4 +905,4 @@ yeccpars2_43_(__Stack0) ->
   end | __Stack].
 
 
--file("src/aerl_decomp.yrl", 77).
+-file("src/aerl_decomp.yrl", 74).

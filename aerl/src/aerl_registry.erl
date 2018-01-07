@@ -82,6 +82,13 @@ update_pred(Pred, Pid) when is_tuple(Pred) ->
 %%--------------------------------------------------------------------
 init([Mode]) ->
     process_flag(trap_exit, true), %% faster than erlang:monitor/2
+    %% Test read index key
+    mnesia:create_table(aerl_store,
+     			[{attributes,record_info(fields,aerl_store)}]),
+    mnesia:create_table(aerl_pub,
+     			[{attributes,record_info(fields,aerl_pub)}]),
+    mnesia:create_table(aerl_sub,
+     			[{attributes,record_info(fields,aerl_sub)}]),
     {ok, #state{mode = Mode}}.
 
 %%--------------------------------------------------------------------
@@ -120,18 +127,20 @@ handle_call({unregister, Pid}, _From, State) ->
     Reply = case mnesia:dirty_read(aerl_store, Pid) of
 		[_Process] ->
 		    mnesia:dirty_delete(aerl_store, Pid),
+		    mnesia:dirty_delete(aerl_sub, Pid),
+		    mnesia:dirty_delete(aerl_pub, Pid),
 		    ok;
 		_ -> {error, undefined}
 	    end,
     {reply, Reply, State};
 handle_call({update_att, Env}, {Pid, _} = _From, State) ->
+    Rec = ms_util:make_rec(aerl_store,Env++[{pid,Pid}]),
     Reply = case mnesia:dirty_read(aerl_store, Pid) of
-		[Process] -> mnesia:dirty_write(Process#aerl_store{env = Env}),
+		[_Process] -> mnesia:dirty_write(Rec),
 			     ok;
 		_ -> {error, undefined}
 	    end,
     {reply, Reply, State}.
-
 %% handle_call({update_pred, Pred}, {Pid, _}=From, State) ->
 %%     Reply = case mnesia:dirty_read(aerl_store, Pid) of
 %% 	[Process] -> mnesia:dirty_write(Process#aerl_store{pred = Pred}),
@@ -202,25 +211,47 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-register_handle(Pid, Env, From) ->
+register_handle(Pid, Env, From) when is_map(Env) ->
+    register_handle(Pid,maps:to_list(Env), From);
+register_handle(Pid, Env, From) when is_list(Env) ->
+    NewEnv = [{pid,Pid}]++Env,
+    Rec1 = ms_util:make_rec(aerl_store,NewEnv),
+%    Rec2 = ms_util:make_rec(aerl_pub,NewEnv),
+    %%io:format("To be registered ~p~n",[Rec,
     Reply = case mnesia:dirty_read(aerl_store, Pid) of
 		[_Process] ->
 		    {error, pid_already_registered};
 		_ ->
-		    F = fun(_) -> true end,
-		    mnesia:dirty_write(#aerl_store{pid = Pid,
-						   id = maps:get(id,Env),
-						   env = Env,
-						   pred = F}),
+		    mnesia:dirty_write(Rec1),
+%		    mnesia:dirty_write(Rec2),
+		    %Now = now_to_micro_seconds(os:timestamp()),
+		    %mnesia:dirty_write(#aerl_store{pid=Pid}),
+		    %%io:format("~p~n",[Pid]),
+		    %%io:format("~p~n",[Now]),
 		    link(Pid),
 		    ok
     end,
     gen_server:reply(From,Reply).
 
+atom_from_Pid(Pid) ->
+    L = pid_to_list(Pid),
+    list_to_atom(L).
+
 predicate_handle(Pred,Pid) ->
     Fun = aerl_check:make_fun(Pred),
-    case mnesia:dirty_read(aerl_store, Pid) of
-    	[Process] ->
-	    mnesia:dirty_write(Process#aerl_store{pred = Fun});
-    	_ -> ok
-    end.
+    NewEnv=[{pid,Pid},{pred,Fun}],
+    Rec1 = ms_util:make_rec(aerl_sub,NewEnv),
+    mnesia:dirty_write(Rec1),
+    %io:format("~p~n",[Fun]),
+    %% case mnesia:dirty_read(aerl_sub, Pid) of
+    %% 	[Process] ->
+    %% 	    mnesia:dirty_write(Process#aerl_sub{pred = Fun});
+    %% 	_ -> ok
+    %% end.
+    ok.
+
+seconds_to_micro_seconds(Seconds) ->
+    Seconds * 1000 * 1000.
+
+now_to_micro_seconds({MegaSecs, Secs, MicroSecs}) ->
+    MegaSecs * 1000 * 1000 * 1000 * 1000 + Secs * 1000 * 1000 + MicroSecs.

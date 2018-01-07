@@ -1,10 +1,13 @@
 -module(ms_util).
 
--export([make_ms/2]).
+-export([make_ms/2,make_rec/2]).
 
 %%%
 %%% External Functions (API)
 %%%
+
+print(X) ->
+    io:format("~p~n",[X]).
 
 make_ms(Rec,List) when is_atom(Rec), is_list(List) ->
     NoFields=ms_util2:no_of_fields(Rec),
@@ -12,16 +15,49 @@ make_ms(Rec,List) when is_atom(Rec), is_list(List) ->
     Return=list_to_tuple([Rec|build(NewList,NoFields)]),
     Return.
 
+make_rec(Rec,Env) when is_atom(Rec), is_list(Env) ->
+    List = proplists:get_keys(Env),
+    NoFields=ms_util2:no_of_fields(Rec),
+    NewList=proc_list1(Rec,List),
+    Inter = build1(NewList,NoFields,Env),
+    Return=list_to_tuple([Rec|Inter]),
+    Return;
+make_rec(Rec,Env) when is_atom(Rec) ->
+    List = proplists:get_keys([Env]),
+    NoFields=ms_util2:no_of_fields(Rec),
+    NewList=proc_list1(Rec,List),
+    Inter = build1(NewList,NoFields,[Env]),
+    Return=list_to_tuple([Rec|Inter]),
+    Return.
+
+
+
+
 %%%
 %%% Internal Functions
 %%%
+
+proc_list1(Rec,List) -> proc_list1(Rec,List,[]).
+
+%% bit funky - return the list sorted in reverse order
+proc_list1(Rec,[],Acc)            -> lists:reverse(lists:keysort(2,Acc));
+proc_list1(Rec,[Field|T],Acc) ->
+    proc_list1(Rec,T,[{Field,aerl_utils:getIndex(Field,Rec)}|Acc]).
+
+build1(List,NoFields,Data) -> build1(List,NoFields,[],Data).
+
+build1([],0,Acc,_)           -> Acc;
+build1([{Name,N}|T],N,Acc,Data)        -> build1(T,N-1,[proplists:get_value(Name,Data)|Acc],Data);
+build1([H|T],N,Acc,Data)        -> build1([H|T],N-1,['_'|Acc],Data);%don't drop H - will match later
+build1([],N,Acc,Data)           -> build1([],N-1,['_'|Acc],Data).
+
 
 proc_list(Rec,List) -> proc_list(Rec,List,[]).
 
 %% bit funky - return the list sorted in reverse order
 proc_list(Rec,[],Acc)            -> lists:reverse(lists:sort(Acc));
 proc_list(Rec,[Field|T],Acc) ->
-    proc_list(Rec,T,[ms_util2:get_index(Rec,Field)|Acc]).
+    proc_list(Rec,T,[aerl_utils:getIndex(Field,Rec)|Acc]).
 
 build(List,NoFields) -> build(List,NoFields,[]).
 

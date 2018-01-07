@@ -5,8 +5,10 @@
 %% API
 -export([start_link/1,
 	 a_send/3,
-	 a_receive/1]).
-
+	 send/3,
+	 s_send/3,
+	 a_receive/2]).
+-export([build_rguard/1]).
 -compile(export_all).
 
 %% gen_server callbacks
@@ -15,9 +17,9 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {mode,last}).
+-record(state,{mode}).
 
--include("../include/aerl.hrl").
+-include("aerl.hrl").
 
 %%%===================================================================
 %%% API
@@ -41,14 +43,21 @@ start_link(Mode) ->
 
 a_send(Pred, Msg, Env) ->
     %%wpool:cast(?MODULE,{Pred, Msg, Env, self()}, random_worker).
+    %%gen_server:cast(?SERVER, {Pred, Msg, Env}).
     gen_server:cast(?SERVER, {Pred, Msg, Env, self()}).
+
+send(Pred, Msg, Env) ->
+    %%wpool:cast(?MODULE,{Pred, Msg, Env, self()}, random_worker).
+    %%gen_server:cast(?SERVER, {Pred, Msg, Env}).
+    gen_server:cast(?SERVER, {normal, Pred, Msg, Env, self()}).
 
 s_send(Pred, Msg, Env) ->
     %%wpool:cast(?MODULE,{Pred, Msg, Env, self()}, random_worker).
     gen_server:call(?SERVER, {Pred, Msg, Env}).
 
-last_act() ->
-    gen_server:call(?SERVER, last_act).
+a_receive(Pred, Pid) ->
+    %%wpool:cast(?MODULE,{Pred, Msg, Env, self()}, random_worker).
+    gen_server:cast(?SERVER, {Pred, Pid}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -66,7 +75,7 @@ last_act() ->
 %% @end
 %%--------------------------------------------------------------------
 init([Mode]) ->
-    {ok, #state{mode=Mode,last=last()}}.
+    {ok, #state{mode=Mode}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -82,26 +91,18 @@ init([Mode]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call(last_act, _From, State) ->
-    Last = State#state.last,
-    Now = last(),
-    Reply = (Now - Last)*1000,
-    {reply, Reply, State#state{last=last()}};
 handle_call({Pred,Msg,Env}, From, State) ->
-    Reply = case State#state.mode of
-	%% broadcast ->
-	%%     spawn(fun() -> broadcast(Pred,Msg,Env,Pid) end);
-	%% pushing ->
-	%%     spawn(fun() -> pushing(Pred,Msg,Env,Pid) end);
-	%% pulling ->
-	%%     spawn(fun() -> pulling(Pred,Msg,Env,Pid) end);
-	default ->
-	    spawn(fun() -> default2(Pred,Msg,Env,From) end)
+    case State#state.mode of
+	pushpull ->
+	    pushpull(Pred,Msg,Env,From);
+	push ->
+	    push(Pred,Msg,Env,From);
+	broadcast ->
+	    bcast(Pred,Msg,Env,From);
+	pull ->
+	    pull(Pred,Msg,Env,From)
     end,
-    {noreply, State#state{last=last()}}.
-
-
-
+    {noreply, State}.
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
@@ -112,20 +113,35 @@ handle_call({Pred,Msg,Env}, From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-
 handle_cast({Pred,Msg,Env,Pid}, State) ->
     case State#state.mode of
+	pushpull ->
+	        spawn(fun() -> pushpull(Pred,Msg,Env,Pid) end);
+	push ->
+	        spawn(fun() -> push(Pred,Msg,Env,Pid) end);
 	broadcast ->
-	    spawn(fun() -> broadcast(Pred,Msg,Env,Pid) end);
-	pushing ->
-	    spawn(fun() -> pushing(Pred,Msg,Env,Pid) end);
-	pulling ->
-	    spawn(fun() -> pulling(Pred,Msg,Env,Pid) end);
-	default ->
-	    %% Using general handling
-	    spawn(fun() -> default(Pred,Msg,Env,Pid) end)
+	    %% test
+	    spawn(fun() -> bcast(Pred,Msg,Env,Pid) end);
+	pull ->
+	        spawn(fun() -> pull(Pred,Msg,Env,Pid) end)
     end,
-    {noreply, State#state{last=last()}}.
+    {noreply, State};
+handle_cast({normal,Pred,Msg,Env,Pid}, State) ->
+    case State#state.mode of
+	pushpull ->
+	        spawn(fun() -> pushpull(Pred,Msg,Env,Pid) end);
+	push ->
+	        spawn(fun() -> push(Pred,Msg,Env,Pid) end);
+	broadcast ->
+	    spawn(fun() -> push(Pred,Msg,Env,Pid) end);
+	pull ->
+	        spawn(fun() -> pull(Pred,Msg,Env,Pid) end)
+    end,
+    {noreply, State};
+handle_cast({Pred,Pid}, State) ->
+    spawn(fun() -> handle_receive(Pred,Pid) end),
+    {noreply, State}.
+
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
@@ -167,344 +183,273 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-broadcast(Pred, Msg, Senv, Pid) ->
-    L = mnesia:dirty_select(aerl_store,[{#aerl_store{pid = '$1', _ = '_'},[{'=/=','$1',Pid}],['$1']}]),
-    Fun = aerl_check:make_fun(Pred),
-    [P || P <- L, (P ! {Msg, Fun, Senv}) =:= {Msg, Fun, Senv}].
-    %% lists:foreach(fun(P) ->
-    %% 	P ! {Msg, Pred, Senv}
-    %% end, L).
-
-pushing(Pred, Msg, Senv, Pid) ->
-    Att = att(Pred),
-    Head = ms_util:make_ms(aerl_store,[pid | Att]),
-    Guard = aerl_ms:make(Pred,aerl_store),
-    Result = ['$1'],
-    Pids = mnesia:dirty_select(aerl_store,[
-    					   {Head,
-    					    [Guard],
-    					    Result}
-    					  ]),
-    [P || P <- Pids, (P ! {Msg, aerl_working_pushing, Senv}) =:= {Msg, aerl_working_pushing, Senv}].
-
-    %% QURY THEN SELECT
-    %% Head = #aerl_store{pid = '$1', env = '$2', _ = '_'},
-    %% Guard = [{'=/=','$1',Pid}],
-    %% Guard = [],
-    %% Result = ['$$'],
-    %% L = mnesia:dirty_select(aerl_store,[
-    %% 					{Head,
-    %% 					 Guard,
-    %% 					 Result}
-    %% 				       ]),
-    %% Fun = aerl_check:make_fun(Pred),
-    %% [P ! {Msg, aerl_working_pushing, Senv} || [P,Env] <- L, Fun(Env) =:= true].
-
-pulling(Pred, Msg, Senv, Pid) ->
-    L = mnesia:dirty_select(aerl_store,[{#aerl_store{pid = '$1', pred = '$2', _ = '_'},[{'=/=','$1',Pid}],['$$']}]),
-    lists:foreach(fun([P,Rpred]) -> case rcheck(Rpred,Senv) of
-	true -> P ! {Msg, Pred, aerl_working_pulling};
-	false -> ok
-    end end, L).
-
+%% For handling the asynchronous send
 %% Pred is tokens returned from scanner
-default(Pred,Msg,Senv,Pid) ->
-    %%% FOR GENERAL CASE
-    %% [Att,Guard] = aerl_guard:make(Pred),
-    %% RInfo = [pid,pred],
-    %% Head = ms_util:make_ms(aerl_store,RInfo ++ Att),
-    %% Result = [['$1','$5']],
-    %% Receivers = mnesia:dirty_select(aerl_store,[
-    %% 					   {Head,
-    %% 					    [Guard],
-    %% 					    Result}
-    %% 					  ]),
-    %% [P ! Msg || [P,_] <- Receivers].
-    [Guard] = aerl_decomp:make(Pred),
-    {A,V} = Guard,
-    %%io:format("~p ~p ~n",[A,V]),
-    lists:foreach(
-      fun(X) ->
-	      Pos = ms_util2:get_index(aerl_store,A) + 1,
-	      case mnesia:dirty_index_read(aerl_store,X,Pos) of
-		  [Process]  ->
-		      Process#aerl_store.pid ! Msg;
-		  [] ->
-		      ok
-	      end
-      end,
-      V).
+%% normal send
 
-    %% Fun = aerl_check:make_fun(Pred),
-    %% F1 = fun(Key,Acc) ->
-    %% 		 [Process] = mnesia:dirty_read(aerl_store, Key),
-    %% 		 Env = Process#aerl_store.env,
-    %% 		 Rpred = Process#aerl_store.pred,
-    %% 		 case Fun(Env) andalso Rpred(Senv) of
-    %% 		     true -> Process#aerl_store.pid ! Msg, [1|Acc];
-    %% 		     false -> Acc
-    %% 		 end
-    %% 	 end,
-    %% Receivers = dirty_fold(F1,[],aerl_store).
-    %% GENERAL CASE + LIST CONTAINER
-    %% Fun = aerl_check:make_fun(Pred),
-    %% L = mnesia:activity(sync_dirty,
-    %% 		    fun() ->
-    %% 			    mnesia:foldl(
-    %% 			      fun(#aerl_store{pid = Pid, env = Env, pred = Rpred}, Acc) ->
-    %% 				      case Fun(Env) andalso Rpred(Senv) of
-    %% 					 true -> [Pid|Acc];
-    %% 					 false -> Acc
-    %% 				      end
-    %% 			      end,
-    %% 			      [],
-    %% 			      aerl_store)
-    %% 		    end),
-    %% %%io:format("QUERY resutls ~p~n",[L]),
-    %% Receivers = [P ! Msg || P <- L].
+%% default(Pred,Msg,Senv,opt2) ->
+%%     %%FOR EQUALITY and AND/OR case, FAST!
+%%     DNF = aerl_dnf:make(Pred),
+%%     Recv = lists:map(
+%%      fun(Clause) -> %% For each condition ~ sending predicate
+%% 	      Rec = ms_util:make_rec(aerl_store,Clause),
+%% 	      Procs = mnesia:dirty_match_object(Rec), %% match a list of processes
+%% 	      lists:foldl(fun(Process,Sum) ->
+%% 	      			  Process#aerl_store.pid ! {Msg,{Senv}},
+%% 	      			  Sum + 1
+%% 	      		  end, 0, Procs)
+%%      end,
+%% 	     DNF).
+%%     %count_msg(lists:sum(Recv)+1).
 
-    %% QURY THEN SELECT SLOW!!
-%%     RInfo = [pid,env,pred],
-%%     %%Att = lists:usort(att(Pred)),
-%%     Head = ms_util:make_ms(aerl_store,RInfo),
-%% %%    io:format("Match ~p~n",[Head]),
-%% %%    Head = #aerl_store{pid = '$1', env = '$2', pred = '$3', _ = '_'},
-%%     Guard = [],
-%%     Result = ['$$'],
-%%     Fun = aerl_check:make_fun(Pred),
-%%     L = mnesia:dirty_select(aerl_store,[
-%%     					{Head,
-%%     					 Guard,
-%%     					 Result}
-%%     				       ]),
-%%    io:format("QUERY resutls ~p~n",[L]),
-%%    Receivers = [P ! Msg || [P,Env,Rpred] <- L, Fun(Env) =:= true andalso Rpred(Senv) =:= true].
+%% default2(Pred,Msg,Senv,{Pid,_} = From,opt) ->
+%%     %%% FOR GENERAL CASE WITH VERBOSE attributes as collumn names
+%%     [Att,Guard] = aerl_guard:make(Pred),
+%%     Head = ms_util:make_ms(aerl_store,[pid|Att]),
+%%     Result = [['$1']],
+%%     %%io:format(" ~p send ~p to ~p ~n",[Senv,Msg,Pred]),
+%%     %% print(Head),
+%%     %% print(Guard),
+%%     %% print(Result),
+%%     Recv = mnesia:dirty_select(aerl_store,[
+%%     					   {Head,
+%%     					    [Guard],
+%%     					    Result}
+%%     			 		  ]),
+%%     N = length(Recv),
+%%     gen_server:reply(From,N),
+%%     [P ! {Msg,{Pid,Senv}} || [P] <- Recv];
+%% default2(Pred,Msg,Senv,{Pid,_}=From,opt2) ->
+%%     %%FOR EQUALITY and AND/OR case, FAST!
+%%     DNF = aerl_dnf:make(Pred),
+%%     Recv = lists:map(
+%%      fun(Clause) ->
+%% 	      Rec = ms_util:make_rec(aerl_store,Clause),
+%% 	      Procs = mnesia:dirty_match_object(Rec),
+%% 	     %%io:format("~p send to ~p~n",[Senv,Procs]),
+%% 	      lists:foldl(fun(Process,Sum) ->
+%% 	      			  Process#aerl_store.pid ! {Msg,Pid,Senv},
+%% 	      			  Sum + 1
+%% 	      		  end, 0, Procs)
+%%       end,
+%%       DNF),
+%%     %count_msg(lists:sum(Recv)+1),
+%%     gen_server:reply(From,lists:sum(Recv)).
 
-
-default2(Pred,Msg,Senv,From) ->
-    %%% FOR GENERAL CASE
-    %% [Att,Guard] = aerl_guard:make(Pred),
-    %% RInfo = [pid,pred],
-    %% Head = ms_util:make_ms(aerl_store,RInfo ++ Att),
-    %% Result = [['$1','$5']],
-    %% L = mnesia:dirty_select(aerl_store,[
-    %% 					   {Head,
-    %% 					    [Guard],
-    %% 					    Result}
-    %% 			 		  ]),
-    %% Receivers = [P ! Msg || [P,_] <- L],
-    %% gen_server:reply(From,length(Receivers)).
-    %% %%[P ! Msg || [P,Rpred] <- Receivers, Rpred(Senv) =:= true].
-    %% [P ! Msg || [P,_] <- Receivers].
-
-    %%FOR EQUALITY and OR case, FAST!
-    [Guard] = aerl_decomp:make(Pred),
-    {A,V} = Guard,
-    %%io:format("~p ~p ~n",[A,V]),
-    lists:foreach(
-      fun(X) ->
-	      Pos = ms_util2:get_index(aerl_store,A) + 1,
-	      case mnesia:dirty_index_read(aerl_store,X,Pos) of
-		  [Process]  ->
-		      Process#aerl_store.pid ! Msg;
-		  [] ->
-		      ok
-	      end
-      end,
-      V),
-    gen_server:reply(From,length(V)).
-    %% Fun = aerl_check:make_fun(Pred),
-    %% F1 = fun(Key,Acc) ->
-    %% 		 [Process] = mnesia:dirty_read(aerl_store, Key),
-    %% 		 Env = Process#aerl_store.env,
-    %% 		 Rpred = Process#aerl_store.pred,
-    %% 		 case Fun(Env) andalso Rpred(Senv) of
-    %% 		     true -> Process#aerl_store.pid ! Msg, [1|Acc];
-    %% 		     false -> Acc
-    %% 		 end
-    %% 	 end,
-    %% Receivers = dirty_fold(F1,[],aerl_store),
-    %% gen_server:reply(From,length(Receivers)).
-    %% Fun = aerl_check:make_fun(Pred),
-    %% L = mnesia:activity(sync_dirty,
-    %% 		    fun() ->
-    %% 			    mnesia:foldl(
-    %% 			      fun(#aerl_store{pid = Pid, env = Env, pred = Rpred}, Acc) ->
-    %% 				      case Fun(Env) andalso Rpred(Senv) of
-    %% 					 true -> [Pid|Acc];
-    %% 					 false -> Acc
-    %% 				      end
-    %% 			      end,
-    %% 			      [],
-    %% 			      aerl_store)
-    %% 		    end),
-%%    io:format("QUERY resutls ~p~n",[L]),
-%    Receivers = [P ! Msg || P <- L],
- %   QURY THEN SELECT SLOW!!
-    %% RInfo = [pid,env,pred],
-    %% Head = ms_util:make_ms(aerl_store,RInfo),
-    %% Guard = [],
-    %% Result = ['$$'],
-    %% Fun = aerl_check:make_fun(Pred),
-    %% L = mnesia:dirty_select(aerl_store,[
-    %% 					{Head,
-    %% 					 Guard,
-    %% 					 Result}
-    %% 				       ]),
-    %% Receivers = [P ! Msg || [P,Env,Rpred] <- L, Fun(Env) =:= true andalso Rpred(Senv) =:= true],
-    %% gen_server:reply(From,length(Receivers)).
+bcast(Pred,Msg,Senv,Pid) when is_pid(Pid) ->
+    [Att,Guard] = aerl_guard:bguard(Pred,Pid),
+    RInfo = [pid],
+    Head = ms_util:make_ms(aerl_store,RInfo ++ Att),
+    L = mnesia:dirty_select(aerl_store,[{Head,[Guard],['$1']}]),
+    %L = mnesia:dirty_select(aerl_store,[{#aerl_store{pid = '$1', _ = '_'},[{'=/=','$1',Pid}],['$1']}]),
+    Fun = aerl_check:make_fun(Pred),
+    Recv = [P ! {Msg, {ok,Fun,Senv}} || P <- L],
+    %Size = length(Recv)*erlang_term:byte_size({Msg,{Pid,Fun,Senv}}),
+    %count_req(Size),
+    count_msg(length(Recv)),
+    %% count_service(length(L2)),
+    %ets:insert(req,{PId,length(L2)}),
+    ok;
+bcast(Pred,Msg,Senv,{Pid,_}=From) ->
+    [Att,Guard] = aerl_guard:bguard(Pred, Pid),
+    RInfo = [pid],
+    Head = ms_util:make_ms(aerl_store, RInfo ++ Att),
+    Result = ['$1'],
+    %% Return = mnesia:dirty_select(aerl_store,[{Head,[Guard],Result}]),
+    %L = mnesia:dirty_select(aerl_store,[{#aerl_store{pid = '$1', _ = '_'},[{'=/=','$1',Pid}],['$1']}]),
+    L = mnesia:dirty_select(aerl_store, [{Head, [Guard], Result}]),
+    Fun = aerl_check:make_fun(Pred),
+    Recv = [P ! {Msg, {Pid, Fun, Senv}} || P <- L],
+    gen_server:reply(From,length(Recv)),
+    count_msg(length(Recv)),
+    %Size = length(Recv)*erlang_term:byte_size({Msg,{Pid,Fun,Senv}}),
+    %count_req(Size),
+    ok.
 
 
-a_receive(Pred) ->
-    Now = calendar:local_time(),
-    StartTime = calendar:datetime_to_gregorian_seconds(Now),
-    Rpred = evallp(Pred),
-    case aerl_env:getAtt(aerl_working_mode) of
-	broadcast -> receive_broadcast(Rpred,1000,StartTime);
-	pushing -> receive_pushing(Rpred,infinity,StartTime);
-	pulling -> receive_pulling(Rpred,infinity,StartTime)
-    end.
+push(Pred,Msg,Senv,Pid) when is_pid(Pid) ->
+    [Att,Guard] = aerl_guard:make(Pred),
+    RInfo = [pid],
+    Head = ms_util:make_ms(aerl_store,RInfo ++ Att),
+    Result = ['$1'],
+    Recv = mnesia:dirty_select(aerl_store,[{Head,[Guard],Result}]),
+    L2 = [P ! {Msg, {ok, Senv}} || P <- Recv, Pid =/= P],
+    count_msg(length(L2)),
+    %Size = length(L2)*erlang_term:byte_size({Msg,{ok,Senv}}),
+    %count_req(Size),
+    %Now = timer:now_diff(os:timestamp(), Start)/1000,
+    %% ets:insert(broker,{Pid,Now}),
+    %% count_req(1),
+    %% count_service(length(L2)),
+    ok;
+push(Pred, Msg, Senv, {Pid, _} = From) ->
+    [Att, Guard] = aerl_guard:make(Pred),
+    RInfo = [pid],
+    Head = ms_util:make_ms(aerl_store, RInfo ++ Att),
+    Result = ['$1'],
+    Recv = mnesia:dirty_select(aerl_store, [{Head, [Guard], Result}]),
+    L2 = [P ! {Msg, {Pid, Senv}} || P <- Recv, Pid =/= P],
+    gen_server:reply(From, length(L2)),
+    count_msg(length(L2)),
+    %Size = length(L2)*erlang_term:byte_size({Msg,{Pid,Senv}}),
+    %count_req(Size),
+    ok.
 
-a_receive(Pred, Timeout) ->
-    Now = calendar:local_time(),
-    StartTime = calendar:datetime_to_gregorian_seconds(Now),
-    Rpred = evallp(Pred),
-    case aerl_env:getAtt(aerl_working_mode) of
-	broadcast -> receive_broadcast(Rpred, Timeout, StartTime);
-	pushing -> receive_pushing(Rpred, Timeout, StartTime);
-	pulling -> receive_pulling(Rpred, Timeout, StartTime)
-    end.
 
-receive_broadcast(Rpred, Timeout, StartTime) ->
-    Renv = aerl_env:getEnv(),
-    b_receive(Rpred, Renv, Timeout, StartTime).
+pull(Pred, Msg, Env, Pid) when is_pid(Pid) ->
+   % Start = os:timestamp(),
+    Fun = aerl_check:make_fun(Pred),
+    L = mnesia:dirty_select(aerl_sub, [{#aerl_sub{pid = '$1', pred = '$2', _ = '_'}, [{'=/=', '$1', Pid}], ['$$']}]),
+    L2 = [P ! {Msg, {Fun, ok}} || [P, RPred] <- L, RPred =/= undefined andalso RPred(Env) == true],
+    ok;
+pull(Pred, Msg, Env, {Pid, _} = From) ->
+    gen_server:reply(From, ok),
+    Fun = aerl_check:make_fun(Pred),
+    L = mnesia:dirty_select(aerl_sub,[{#aerl_sub{pid = '$1', pred = '$2', _ = '_'},[{'=/=','$1',Pid}],['$$']}]),
+    Recv = [P ! {Msg,{Fun,Pid}} || [P,RPred] <- L, RPred =/= undefined andalso RPred(Env) == true],
+    case Recv of
+	[] ->
+	    Now = now_to_micro_seconds(os:timestamp()),
+	    NewEnv = Env ++ [{pid,Pid},{env,Env},{pred,Fun},{msg,Msg},{time,Now}],
+	    Rec1 = ms_util:make_rec(aerl_pub,NewEnv),
+	    %% store message into table for pulling later
+	    mnesia:dirty_write(Rec1);
+	_ -> ok
+    end,
+    ok.
 
-b_receive(Rpred, Renv, Timeout, StartTime) ->
+
+pushpull(Pred,Msg,Env,Pid) when is_pid(Pid) ->
+    %Start = os:timestamp(),
+    Fun = aerl_check:make_fun(Pred),
+    [Att,Guard] = aerl_guard:make(Pred),
+    RInfo = [pid],
+    Head = ms_util:make_ms(aerl_store,RInfo ++ Att),
+    Result = [['$1']],
+    Recv = mnesia:dirty_select(aerl_store,[{Head,[Guard],Result}]),
+    RGuard = build_rguard(Recv),
+    case RGuard of
+	[] -> pull(Pred,Msg,Env,Pid);
+	_ ->
+	    L = mnesia:dirty_select(aerl_sub,[{#aerl_sub{pid = '$1', pred = '$2', _ = '_'},[RGuard],[['$1','$2']]}]),
+	    L2 = [P ! {Msg,{ok}} || [P,RPred] <- L, RPred =/= undefined andalso RPred(Env) == true, Pid =/= P]
+	    %% Now = timer:now_diff(os:timestamp(), Start)/1000,
+	    %% ets:insert(broker,{Pid,Now}),
+	    %% count_service(length(L2)),
+	    %% count_req(1)
+    end,
+    ok;
+pushpull(Pred,Msg,Env,From) ->
+    gen_server:reply(From,ok),
+    Fun = aerl_check:make_fun(Pred),
+    [Att,Guard] = aerl_guard:make(Pred),
+    RInfo = [pid],
+    Head = ms_util:make_ms(aerl_store,RInfo ++ Att),
+    Result = [['$1']],
+    Recv = mnesia:dirty_select(aerl_store,[{Head,[Guard],Result}]),
+    lists:foreach(fun([P]) ->
+			 [RPred] = mnesia:dirty_select(aerl_sub,[{#aerl_sub{pid = '$1', pred = '$2', _ = '_'},[{'==','$1',P}],['$2']}]),
+			  case RPred =/= undefined andalso RPred(Env) of
+			      true -> P ! {Msg, {ok}};
+			      false -> ok
+			  end
+		  end, Recv),
+    ok.
+
+handle_receive(RPred,Pid) ->
+    Now = now_to_micro_seconds(os:timestamp()),
+    Fun = aerl_check:make_fun(RPred),
+    [Att,Guard] = aerl_guard:make(RPred),
+    TimeGuard = {'and',{'=<',{'-',Now,'$5'},10000},Guard},
+    RInfo = [pid,pred,msg,time],
+    Head = ms_util:make_ms(aerl_pub,RInfo ++ Att),
+%    io:format("My table ~p~n",[ets:tab2list(aerl_pub)]),
+    Result = [['$1','$3','$4']],
+ %   io:format("Retrive from table with  ~p, ~p , ~p ~n", [Head,TimeGuard,Result]),
+    mnesia:subscribe({table, aerl_pub, simple}),
+    Recv = mnesia:dirty_select(aerl_pub,[{Head,[TimeGuard],Result}]),
+%    count_req(1),
+    Re = pull_msg(Recv,Pid),
+  %  io:format("Re ~p~n",[Recv]),
+    %Re = [Pid ! {Msg,{SPred}} || [P,SPred,Msg] <- Recv, Pid =/= P],
+ %   io:format("Filter ~p~n",[Re]),
+    checksubscribe(Re,Fun,Pid),
+    %%L = mnesia:dirty_select(aerl_pub,[{#aerl_pub{pid = '$1', env = '$2', pred = '$3', msg='$4'},[{'=/=','$1',Pid}],['$$']}]),
+    ok.
+
+pull_msg([],Pid) -> [];
+pull_msg([[Pid,SPred,Msg]|Recv],Pid) -> pull_msg(Recv,Pid);
+pull_msg([[_P,SPred,Msg]|Recv],Pid) ->
+    Pid ! {Msg,{SPred}}.
+
+checksubscribe([],RPred,Pid) ->
     receive
-	{aerl_working_broadcast, Spred, Msg, Senv} ->
-	    case scheck(Spred, Renv) andalso rcheck(Rpred, Senv) of
+	{_,{_,Rec,_}} when element(2,Rec) =/= Pid ->
+	    Env = element(3,Rec),
+	    case RPred(Env) of
 		true ->
-		    self() ! {aerl_message, Msg};
+		    Pid ! {element(5,Rec),{element(4,Rec)}};
 		false ->
-		    b_receive(Rpred, Renv, time_left(StartTime,Timeout), StartTime)
+		    checksubscribe([],RPred,Pid)
 	    end
-    after Timeout ->
-	    ok
-    end.
-
-check(Pred, aerl_working_pushing, Senv) ->
-    rcheck(Pred, Senv);
-check(Rpred, Spred, aerl_working_pulling) ->
-    Renv = aerl_env:getEnv(),
-    scheck(Spred, Renv);
-check(Rpred, Spred, Senv) ->
-    Renv = aerl_env:getEnv(),
-    Spred(Renv)	andalso Rpred(Senv).
-
-receive_pushing(Rpred, Timeout, StartTime) ->
-    Renv = aerl_env:getEnv(),
-    aerl_env:update_att(Renv),
-    sh_receive(Rpred, Timeout, StartTime).
-
-sh_receive(Rpred, Timeout, StartTime) ->
-    receive
-	{aerl_working_pushing, Msg, Senv} ->
-	    case rcheck(Rpred, Senv) of
-		true ->
-		    self() ! {aerl_message, Msg};
-		false ->
-		    sh_receive(Rpred, time_left(StartTime,Timeout), StartTime)
-	    end
-    after Timeout ->
-	    ok
-    end.
-
-receive_pulling(Rpred, Timeout, StartTime) ->
-    aerl_env:update_pred(Rpred),
-    Renv = aerl_env:getEnv(),
-    ll_receive(Renv, Timeout, StartTime).
-
-ll_receive(Renv, Timeout, StartTime) ->
-    receive
-	{aerl_working_pulling, Msg, Spred} ->
-	    case scheck(Spred, Renv) of
-		true ->
-		    self() ! {aerl_message, Msg};
-		false ->
-		    ll_receive(Renv,time_left(StartTime,Timeout), StartTime)
-	    end
-    after Timeout ->
-	    ok
-    end.
-
-%% Replace local reference s to the corresponding values in the local environment
-evallp(P) ->
-    L = string:tokens(P,"\s"),
-    L1 = [case string:left(X,5) == "this." of
-	      true ->
-		  [_,Key] = string:tokens(X,"."),
-		  lists:concat(["this." | io_lib:format("~p", [get(list_to_atom(Key))])]);
-	      false -> X end || X <- L],
-    string:join(L1," ").
-
-evallp2(P) ->
-    {ok, T, _} = aerl_scanner:string(P),
-    T.
+    end;
+checksubscribe(_,_,_) -> ok.
 
 
-evallp1(P) ->
-    %% L = string:tokens(P,"\s"),
-    %% L1 = [case string:left(X,5) == "this." of
-    %% 	      true ->
-    %% 		  [_,Key] = string:tokens(X,"."),
-    %% 		  lists:concat(["this." | io_lib:format("~p", [get(list_to_atom(Key))])]);
-    %% 	      false -> X end || X <- L],
-    %% Pred = string:join(L1," "),
-    aerl_check:make_fun(P).
-
-scheck(Spred, Renv) ->
-    %F = binary_to_term(Spred),
-    Spred(Renv).
-
-rcheck(Rpred, Senv) ->
-    Rpred(Senv).
-    %aerl_check:string(Rpred,Senv).
-
-time_left(_StartTime, infinity) ->
-    infinity;
-time_left(StartTime, LeaseTime) ->
-    Now = calendar:local_time(),
-    CurrentTime =  calendar:datetime_to_gregorian_seconds(Now),
-    TimeElapsed = CurrentTime - StartTime,
-    case LeaseTime - TimeElapsed*1000 of
-        Time when Time =< 0 -> 0;
-        Time                -> Time
-    end.
+build_rguard([]) -> [];
+build_rguard([[Pid]]) ->
+    {'==','$1',Pid};
+build_rguard([[P1]|Recv]) ->
+    {'or',{'==','$1',P1},build_rguard(Recv)}.
 
 
-att(L) ->
-    build(L,[]).
+seconds_to_micro_seconds(Seconds) ->
+    Seconds * 1000 * 1000.
 
-build([],Acc) ->
-    Acc;
-build([{attribute,_,Att}|T], Acc) ->
-    build(T,[Att|Acc]);
-build([_|T],Acc) ->
-    build(T,Acc).
+now_to_micro_seconds({MegaSecs, Secs, MicroSecs}) ->
+    MegaSecs * 1000 * 1000 * 1000 * 1000 + Secs * 1000 * 1000 + MicroSecs.
 
-last() ->
-    Now = calendar:local_time(),
-    calendar:datetime_to_gregorian_seconds(Now).
+count_service(0) -> ok;
+count_service(X) when X > 0 ->
+    ets:update_counter(service,num,X);
+count_service(X) ->
+    io:format("~p ~n",[X]).
 
 
-dirty_fold(Fun, Acc, Tab) ->
-  Key = mnesia:dirty_first(Tab),
-  dirty_fold(Fun, Acc, Tab, Key).
+count_req(0) -> ok;
+count_req(X) when X > 0 ->
+    ets:update_counter(request,num,X);
+count_req(X) ->
+    io:format("~p ~n",[X]).
 
-dirty_fold(Fun, Ret, Tab, '$end_of_table') ->
-  Ret;
-dirty_fold(Fun, Acc, Tab, Key) ->
-  NxtAcc = Fun(Key, Acc),
-  NxtKey = mnesia:dirty_next(Tab, Key),
-  dirty_fold(Fun, NxtAcc, Tab, NxtKey).
+count_msg(0) -> ok;
+count_msg(X) when X > 0 ->
+    ets:update_counter(message,num,X);
+count_msg(X) ->
+    io:format("~p ~n",[X]).
+
+%% pmap(F, L) ->
+%%     S = self(),
+%%     Ref = make_ref(),
+%%     lists:foreach(fun(I) ->
+%% 		    spawn(fun() -> do_f1(S, Ref, F, I) end)
+%% 	    end, L),
+%%     %% gather the results
+%%     gather1(length(L), Ref, []).
+
+%% do_f1(Parent, Ref, F, I) ->
+%%     C = self(),
+%%     io:format("Send ~p to ~p ~n",[C,I]),
+%%     catch F(I,C),
+%%     Ret =
+%% 	receive
+%% 	    Msg ->
+%% 		Msg
+%% 	end,
+%%     Parent ! {Ref, Ret}.
+
+%% gather1(0, _, L) -> L;
+%% gather1(N, Ref, L) ->
+%%     receive
+%% 	{Ref, Ret} -> gather1(N-1, Ref, [Ret|L])
+%%     end.
